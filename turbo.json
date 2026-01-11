@@ -1,10 +1,26 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "globalDependencies": ["**/.env"],
+  "globalDependencies": [
+    "**/.env"
+  ],
+  "globalEnv": [
+    "DATABASE_URL",
+    "SUPER_ADMIN_EMAIL",
+    "STACK_SECRET_SERVER_KEY",
+    "NEXT_PUBLIC_STACK_PROJECT_ID",
+    "NEXT_PUBLIC_STACK_PUBLISHABLE_CLIENT_KEY",
+    "NEXT_PUBLIC_APP_URL"
+  ],
   "tasks": {
     "build": {
-      "dependsOn": ["^build"],
-      "outputs": [".next/**", "!.next/cache/**", "dist/**"]
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        ".next/**",
+        "!.next/cache/**",
+        "dist/**"
+      ]
     },
     "lint": {},
     "dev": {
