@@ -98,38 +98,7 @@ export function GeneralSettings() {
                 </div>
             </section>
 
-            {/* Demo Data Zone */}
-            <section className="space-y-4">
-                <h3 className="text-lg font-semibold text-foreground">Demo & Testing</h3>
-                <div className="bg-indigo-50 dark:bg-indigo-900/10 border border-indigo-100 dark:border-indigo-900/30 rounded-xl p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div>
-                        <h4 className="font-medium text-indigo-900 dark:text-indigo-200 flex items-center gap-2">
-                            <Database className="w-4 h-4" />
-                            Load &quot;KBM&quot; Demo Data
-                        </h4>
-                        <p className="text-sm text-indigo-700 dark:text-indigo-300/70 mt-1 max-w-md">
-                            Injects the &quot;Prosedur Penerbitan Buku (SOP KBM)&quot; protocol and 8 dummy staff users into your current team for testing assignment logic.
-                        </p>
-                    </div>
-                    <button
-                        onClick={handleSeed}
-                        disabled={seeding || seeded}
-                        className={`px-4 py-2 border rounded-lg text-sm font-medium transition-colors shadow-sm whitespace-nowrap flex items-center gap-2
-                            ${seeded
-                                ? 'bg-green-100 border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400'
-                                : 'bg-white dark:bg-indigo-950 border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/40'
-                            }`}
-                    >
-                        {seeding ? (
-                            <><Loader2 className="w-4 h-4 animate-spin" /> Loading...</>
-                        ) : seeded ? (
-                            <><Check className="w-4 h-4" /> Loaded!</>
-                        ) : (
-                            'Inject KBM Data'
-                        )}
-                    </button>
-                </div>
-            </section>
+
 
             <hr className="border-slate-200 dark:border-slate-800" />
 

@@ -23,34 +23,11 @@ export async function seedOrganizationData(organizationId: string, userId: strin
 
     console.log(`Created Protocol: ${protocol.id}`);
 
-    // 2. Create Default Project (Welcome Project)
-    const project = await prisma.project.create({
-        data: {
-            title: 'Welcome to Timework',
-            description: 'This is your first project tailored to demonstrate the platform capabilities.',
-            organizationId,
-            status: 'ACTIVE',
-            createdById: userId, // Ensure we link to creator
-            items: {
-                create: [
-                    {
-                        title: 'Explore Dashboard',
-                        description: 'Navigate through the dashboard to see your project overview.',
-                        status: 'DONE',
-                        originProtocolItemId: null // Ad-hoc item
-                    },
-                    {
-                        title: 'Review SOP Items',
-                        description: 'Check how the protocol items above are instantiated.',
-                        status: 'OPEN',
-                        originProtocolItemId: null
-                    }
-                ]
-            },
-        }
-    });
+    // 2. Project creation removed as requested
+    // const project = await prisma.project.create({ ... });
 
-    console.log(`Created Project: ${project.id}`);
+    // 3. Seed KBM Data (Protocol Only)
+    await seedKBMData(organizationId, userId);
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -96,44 +73,17 @@ export async function seedKBMData(organizationId: string, _currentUserId: string
         include: { items: true } // Need items to link dependencies
     });
 
-    // 2. Create Dependencies
-    const items = protocolKBM.items;
-    const findId = (t: string) => items.find(i => i.title === t)?.id;
+    // 2. Dependencies logic removed as requested
+    // const items = protocolKBM.items;
+    // const findId = (t: string) => items.find(i => i.title === t)?.id;
 
-    const connect = async (c: string, p: string) => {
-        const cId = findId(c); const pId = findId(p);
-        if (cId && pId) await prisma.protocolDependency.create({ data: { itemId: cId, prerequisiteId: pId } });
-    }
+    // const connect = async (c: string, p: string) => {
+    //     const cId = findId(c); const pId = findId(p);
+    //     if (cId && pId) await prisma.protocolDependency.create({ data: { itemId: cId, prerequisiteId: pId } });
+    // }
 
-    // Linear dependencies for main flow
-    await connect('Pembayaran DP', 'Input Data Naskah');
-    await connect('Serah Terima Naskah ke Kordinator', 'Pembayaran DP');
-    await connect('Distribusikan ke Tim', 'Serah Terima Naskah ke Kordinator');
+    // ... (dependency calls removed)
 
-    // Fork
-    await connect('Proses Layout', 'Distribusikan ke Tim');
-    await connect('Proses Desain Cover', 'Distribusikan ke Tim');
-
-    // Merge
-    await connect('Revisi & Finalisasi', 'Proses Layout');
-    await connect('Revisi & Finalisasi', 'Proses Desain Cover');
-
-    // Legalitas
-    await connect('Verifikasi Form Keaslian', 'Pembayaran DP');
-    await connect('Finalisasi Data Legalitas', 'Verifikasi Form Keaslian');
-    await connect('Pengajuan ISBN & HAKI', 'Finalisasi Data Legalitas');
-    await connect('Input Nomor ISBN & HAKI', 'Pengajuan ISBN & HAKI');
-
-    // Production
-    await connect('ACC Final Print', 'Revisi & Finalisasi');
-    await connect('ACC Final Print', 'Input Nomor ISBN & HAKI');
-
-    await connect('Pelunasan Biaya', 'ACC Final Print');
-    await connect('Proses Naik Cetak', 'Pelunasan Biaya');
-
-    await connect('Pengiriman & Resi', 'Proses Naik Cetak');
-    await connect('Kirim Sertifikat & Link', 'Pengiriman & Resi');
-
-    console.log('✅ KBM Protocol seeded for tenant (No Users)');
+    console.log('✅ KBM Protocol seeded for tenant (Protocol Only, No Dependencies)');
     return protocolKBM;
 }
