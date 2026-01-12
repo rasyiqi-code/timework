@@ -127,7 +127,7 @@ export function ItemBuilder({ protocolId, items: initialItems, users, dict }: It
 
                         {/* Duration Input Removed as per user request (System calculated) */}
 
-                        <div className="w-32 shrink-0 flex flex-col gap-1">
+                        <div className="w-32 shrink-0 flex flex-col gap-2">
                             <select
                                 name="defaultAssigneeId"
                                 className="w-full px-2 py-1.5 rounded bg-white border border-slate-200 text-xs font-medium text-slate-700 focus:outline-none focus:border-indigo-500 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
@@ -137,14 +137,14 @@ export function ItemBuilder({ protocolId, items: initialItems, users, dict }: It
                                     <option key={u.id} value={u.id}>{u.name || 'User'}</option>
                                 ))}
                             </select>
-                        </div>
 
-                        <button
-                            type="submit"
-                            className="px-4 py-1.5 rounded bg-slate-900 text-white text-xs font-bold hover:bg-black transition-colors shrink-0 dark:bg-indigo-600 dark:hover:bg-indigo-500 self-center"
-                        >
-                            {dict.add}
-                        </button>
+                            <button
+                                type="submit"
+                                className="w-full px-4 py-1.5 rounded bg-slate-900 text-white text-xs font-bold hover:bg-black transition-colors shrink-0 dark:bg-indigo-600 dark:hover:bg-indigo-500"
+                            >
+                                {dict.add}
+                            </button>
+                        </div>
                     </div>
                 </form>
             </div>

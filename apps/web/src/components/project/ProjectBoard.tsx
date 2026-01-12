@@ -4,6 +4,9 @@ import { updateItemStatus } from '@/actions/project';
 import { type ProjectItem, type ItemDependency, type Project } from '@repo/database';
 
 type ProjectItemWithRelations = ProjectItem & {
+    type?: 'TASK' | 'NOTE' | 'GROUP';
+    parentId?: string | null;
+    order?: number;
     dependsOn: (ItemDependency & { prerequisite: ProjectItem })[]; // Adjusted type
     requiredBy: ItemDependency[];
 };
@@ -24,73 +27,40 @@ export function ProjectBoard({ project, users, currentUser, dict }: {
     // We want to visualize the workflow "Script" regardless of current status.
 
     const sortedItems = (() => {
+        // Hierarchical Sort (Respect Protocol Order)
         const items = [...project.items];
         const itemMap = new Map(items.map(i => [i.id, i]));
-        const adjacency = new Map<string, string[]>(); // Prereq -> [Dependents]
-        const inDegree = new Map<string, number>();
 
-        // Initialize
+        // 1. Group by Parent
+        const childrenMap = new Map<string, typeof items>();
+        const roots: typeof items = [];
+
         items.forEach(item => {
-            adjacency.set(item.id, []);
-            inDegree.set(item.id, 0);
-        });
-
-        // Build Graph
-        // item.dependsOn contains { prerequisiteId }
-        // So Prereq -> Item is the direction
-        items.forEach(item => {
-            item.dependsOn.forEach(dep => {
-                const prereqId = dep.prerequisiteId;
-                if (!adjacency.has(prereqId)) adjacency.set(prereqId, []); // Robustness check
-                adjacency.get(prereqId)?.push(item.id);
-                inDegree.set(item.id, (inDegree.get(item.id) || 0) + 1);
-            });
-        });
-
-        // Kahn's Algorithm
-        const queue: string[] = [];
-        const result: ProjectItemWithRelations[] = [];
-
-        // Find initial nodes (in-degree 0)
-        items.forEach(item => {
-            if ((inDegree.get(item.id) || 0) === 0) {
-                queue.push(item.id);
+            if (item.parentId) {
+                if (!childrenMap.has(item.parentId)) childrenMap.set(item.parentId, []);
+                childrenMap.get(item.parentId)?.push(item);
+            } else {
+                roots.push(item);
             }
         });
 
-        // Sort queue initially by title/status for determinism among parallel starts
-        queue.sort((a, b) => {
-            const itemA = itemMap.get(a)!;
-            const itemB = itemMap.get(b)!;
-            return itemA.title.localeCompare(itemB.title);
-        });
+        // 2. Recursive Flatten items
+        const result: typeof items = [];
 
-        while (queue.length > 0) {
-            const currentId = queue.shift()!;
-            const currentItem = itemMap.get(currentId)!;
-            result.push(currentItem);
+        const traverse = (nodes: typeof items) => {
+            // Sort by Order
+            nodes.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
-            const neighbors = adjacency.get(currentId) || [];
-            // Sort neighbors to ensure deterministic order if multiple branches open up
-            neighbors.sort((a, b) => itemMap.get(a)!.title.localeCompare(itemMap.get(b)!.title));
-
-            for (const neighborId of neighbors) {
-                inDegree.set(neighborId, (inDegree.get(neighborId) || 0) - 1);
-                if (inDegree.get(neighborId) === 0) {
-                    queue.push(neighborId);
+            nodes.forEach(node => {
+                result.push(node);
+                const children = childrenMap.get(node.id);
+                if (children) {
+                    traverse(children);
                 }
-            }
-        }
+            });
+        };
 
-        // If cycles exist or disconnected parts were missed, append remaining items
-        if (result.length !== items.length) {
-            const resultIds = new Set(result.map(i => i.id));
-            const remaining = items.filter(i => !resultIds.has(i.id));
-            // Just sorting remaining by title
-            remaining.sort((a, b) => a.title.localeCompare(b.title));
-            return [...result, ...remaining];
-        }
-
+        traverse(roots);
         return result;
     })();
 
@@ -167,6 +137,7 @@ export function ProjectBoard({ project, users, currentUser, dict }: {
                             index={index}
                             currentUser={currentUser}
                             dict={dict}
+                            projectOwnerId={project.createdById}
                         />
                     </div>
                 ))}

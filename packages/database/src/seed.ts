@@ -1,13 +1,282 @@
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, ProtocolItemType } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
-async function main() {
-    console.log('🌱 Starting seed (Protocol Only)...')
+// Define types for our seed data
+type SeedItem = {
+    title: string
+    type: ProtocolItemType
+    role?: 'ADMIN' | 'STAFF' // Default ADMIN
+    children?: SeedItem[]
+}
 
-    // ==========================================
-    // 1. UPSERT ORGANIZATION (Tenant)
-    // ==========================================
+type ProtocolDefinition = {
+    name: string
+    description: string
+    items: SeedItem[]
+}
+
+// 1. Protocol Reguler Penerbit KBM
+const kbmReguler: SeedItem[] = [
+    { title: 'DP (UANG MUKA)', type: 'TASK', role: 'ADMIN' },
+    { title: 'Naskah Masuk dari Penulis', type: 'TASK', role: 'ADMIN' },
+    { title: 'REQUEST PENULIS', type: 'NOTE', role: 'ADMIN' },
+    { title: 'KETERANGAN TAMBAHAN', type: 'NOTE', role: 'ADMIN' },
+    {
+        title: 'LAYOUT',
+        type: 'GROUP',
+        children: [
+            { title: 'Naskah dikirim Ke Kordinator Layout', type: 'TASK', role: 'STAFF' },
+            { title: 'Naskah diterima Ke Kordinator Layout', type: 'TASK', role: 'STAFF' },
+            { title: 'Layout Selesai', type: 'TASK', role: 'STAFF' }
+        ]
+    },
+    {
+        title: 'COVER',
+        type: 'GROUP',
+        children: [
+            { title: 'Naskah dikirim Ke Kordinator Cover', type: 'TASK', role: 'STAFF' },
+            { title: 'Naskah diterima Kordinator Cover', type: 'TASK', role: 'STAFF' },
+            { title: 'Cover Selesai', type: 'TASK', role: 'STAFF' }
+        ]
+    },
+    {
+        title: 'SURAT KEASLIAN',
+        type: 'GROUP',
+        children: [
+            { title: 'Template Surat dikirim ke Penulis', type: 'TASK', role: 'ADMIN' },
+            { title: 'Surat Keaslian diterima dari Penulis', type: 'TASK', role: 'ADMIN' }
+        ]
+    },
+    {
+        title: 'ISBN/QRCBN/QRSBN',
+        type: 'GROUP',
+        children: [
+            { title: 'ISBN/QRCBN/QRSBN Diajukan', type: 'TASK', role: 'STAFF' },
+            { title: 'ISBN/QRCBN/QRSBN Keluar', type: 'TASK', role: 'STAFF' },
+            { title: 'Detail Nomor ISBN/QRCBN/QRSBN', type: 'NOTE', role: 'STAFF' }
+        ]
+    },
+    {
+        title: 'HAKI',
+        type: 'GROUP',
+        children: [
+            { title: 'HAKI diajukan', type: 'TASK', role: 'STAFF' },
+            { title: 'HAKI keluar', type: 'TASK', role: 'STAFF' }
+        ]
+    },
+    {
+        title: 'ACC NASKAH',
+        type: 'GROUP',
+        children: [
+            { title: 'Naskah di ACC Cetak Oleh Penulis', type: 'TASK', role: 'STAFF' },
+            { title: 'Detail Alamat Kirim Buku Cetakan', type: 'NOTE', role: 'ADMIN' }
+        ]
+    },
+    { title: 'PELUNASAN', type: 'TASK', role: 'ADMIN' },
+    { title: 'NAIK CETAK', type: 'TASK', role: 'ADMIN' },
+    {
+        title: 'ADM. PASCA CETAK',
+        type: 'GROUP',
+        children: [
+            { title: 'Form Penjualan & Royalty', type: 'TASK', role: 'ADMIN' },
+            { title: 'Testimoni Penulis', type: 'TASK', role: 'ADMIN' },
+            { title: 'Sertifikat Buku', type: 'TASK', role: 'ADMIN' }
+        ]
+    },
+    {
+        title: 'DISTRIBUSI & PUBLIKASI',
+        type: 'GROUP',
+        children: [
+            { title: 'Upload Playbook', type: 'TASK', role: 'ADMIN' },
+            { title: 'Link Playbook di Kirim ke Penulis', type: 'TASK', role: 'ADMIN' },
+            { title: 'Upload Shopee', type: 'TASK', role: 'ADMIN' },
+            { title: 'Link Shopee di Kirim ke Penulis', type: 'TASK', role: 'ADMIN' },
+            { title: 'Upload OMP', type: 'TASK', role: 'ADMIN' },
+            { title: 'Link OMP di Kirim ke Penulis', type: 'TASK', role: 'ADMIN' }
+        ]
+    },
+    { title: 'Resi Diterima', type: 'TASK', role: 'STAFF' },
+    { title: 'Resi Dikirim ke Penulis', type: 'TASK', role: 'ADMIN' }
+]
+
+// 2. Protocol Satuan Mitra Penerbit (SPT)
+const sptMitra: SeedItem[] = [
+    {
+        title: 'DP & NASKAH',
+        type: 'GROUP',
+        children: [
+            { title: 'Tanggal DP', type: 'TASK', role: 'ADMIN' },
+            { title: 'Tanggal Naskah Masuk', type: 'TASK', role: 'ADMIN' },
+            { title: 'REQUEST PENULIS', type: 'NOTE', role: 'ADMIN' },
+            { title: 'PERUBAHAN/ TAMBAHAN REQUEST PENULIS', type: 'NOTE', role: 'ADMIN' }
+        ]
+    },
+    {
+        title: 'LAYOUT',
+        type: 'GROUP',
+        children: [
+            { title: 'Naskah dikirim Ke Kordinator Layout', type: 'TASK', role: 'STAFF' },
+            { title: 'Naskah Diterima dari Kordinator Layout', type: 'TASK', role: 'STAFF' },
+            { title: 'Layout Selesai', type: 'TASK', role: 'STAFF' }
+        ]
+    },
+    {
+        title: 'COVER',
+        type: 'GROUP',
+        children: [
+            { title: 'Naskah dikirim Ke Kordinator Cover', type: 'TASK', role: 'STAFF' },
+            { title: 'Naskah diterima dari Kordinator Cover', type: 'TASK', role: 'STAFF' },
+            { title: 'Cover Selesai', type: 'TASK', role: 'STAFF' }
+        ]
+    },
+    {
+        title: 'SURAT KEASLIAN',
+        type: 'GROUP',
+        children: [
+            { title: 'Template Surat dikirim ke Penulis', type: 'TASK', role: 'ADMIN' },
+            { title: 'Surat Keaslian diterima dari Penulis', type: 'TASK', role: 'ADMIN' }
+        ]
+    },
+    {
+        title: 'ISBN/QRCBN/QRSBN',
+        type: 'GROUP',
+        children: [
+            { title: 'ISBN/QRCBN/QRSBN Diajukan', type: 'TASK', role: 'STAFF' },
+            { title: 'ISBN/QRCBN/QRSBN Keluar', type: 'TASK', role: 'STAFF' },
+            { title: 'Detail Nomor ISBN/QRCBN/QRSBN', type: 'NOTE', role: 'STAFF' }
+        ]
+    },
+    {
+        title: 'HAKI',
+        type: 'GROUP',
+        children: [
+            { title: 'HAKI diajukan', type: 'TASK', role: 'STAFF' },
+            { title: 'HAKI keluar', type: 'TASK', role: 'STAFF' }
+        ]
+    },
+    {
+        title: 'ACC NASKAH',
+        type: 'GROUP',
+        children: [
+            { title: 'Naskah di ACC Cetak Oleh Penulis', type: 'TASK', role: 'STAFF' },
+            { title: 'Detail Alamat Kirim Buku Cetakan', type: 'NOTE', role: 'ADMIN' }
+        ]
+    },
+    { title: 'PELUNASAN', type: 'TASK', role: 'ADMIN' },
+    { title: 'NAIK CETAK', type: 'TASK', role: 'ADMIN' },
+    {
+        title: 'ADM. PASCA CETAK',
+        type: 'GROUP',
+        children: [
+            { title: 'Form Penjualan & Royalty', type: 'TASK', role: 'ADMIN' },
+            { title: 'Testimoni Penulis', type: 'TASK', role: 'ADMIN' },
+            { title: 'Sertifikat Buku', type: 'TASK', role: 'ADMIN' }
+        ]
+    },
+    {
+        title: 'DISTRIBUSI & PUBLIKASI',
+        type: 'GROUP',
+        children: [
+            { title: 'Upload Playbook', type: 'TASK', role: 'ADMIN' },
+            { title: 'Link Playbook di Kirim ke Penulis', type: 'TASK', role: 'ADMIN' },
+            { title: 'Upload Shopee', type: 'TASK', role: 'ADMIN' },
+            { title: 'Link Shopee di Kirim ke Penulis', type: 'TASK', role: 'ADMIN' },
+            { title: 'Upload OMP', type: 'TASK', role: 'ADMIN' },
+            { title: 'Link OMP di Kirim ke Penulis', type: 'TASK', role: 'ADMIN' }
+        ]
+    },
+    { title: 'Resi Diterima', type: 'TASK', role: 'STAFF' },
+    { title: 'Resi Dikirim ke Mitra SPT', type: 'TASK', role: 'ADMIN' }
+]
+
+// 3. Jasa Layout
+const jasaLayout: SeedItem[] = [
+    { title: 'DP', type: 'TASK', role: 'ADMIN' },
+    { title: 'Data Masuk (Naskah, Draft)', type: 'TASK', role: 'ADMIN' },
+    { title: 'REQUEST Khusus', type: 'NOTE', role: 'ADMIN' },
+    { title: 'Diserahkan ke Kordinator Layout', type: 'TASK', role: 'ADMIN' },
+    { title: 'Layout Selesai', type: 'TASK', role: 'STAFF' },
+    { title: 'Revisi', type: 'TASK', role: 'STAFF' },
+    { title: 'Pelunasan', type: 'TASK', role: 'ADMIN' },
+    { title: 'Dikirim ke Mitra/Client', type: 'TASK', role: 'ADMIN' },
+    { title: 'Selesai', type: 'TASK', role: 'ADMIN' }
+]
+
+// 4. Jasa Desain Cover
+const jasaCover: SeedItem[] = [
+    { title: 'DP', type: 'TASK', role: 'ADMIN' },
+    { title: 'Data Masuk (Naskah, Draft)', type: 'TASK', role: 'ADMIN' },
+    { title: 'REQUEST Khusus', type: 'NOTE', role: 'ADMIN' },
+    { title: 'Naskah dibagi Ke Kordinator Cover', type: 'TASK', role: 'ADMIN' },
+    { title: 'Cover Selesai', type: 'TASK', role: 'STAFF' },
+    { title: 'Revisi', type: 'TASK', role: 'STAFF' },
+    { title: 'Pelunasan', type: 'TASK', role: 'ADMIN' },
+    { title: 'Dikirim ke Mitra/Client', type: 'TASK', role: 'ADMIN' },
+    { title: 'Selesai', type: 'TASK', role: 'ADMIN' }
+]
+
+// 5. Jasa HAKI
+const jasaHaki: SeedItem[] = [
+    { title: 'DP', type: 'TASK', role: 'ADMIN' },
+    { title: 'Data Masuk (Naskah, Draft)', type: 'TASK', role: 'ADMIN' },
+    { title: 'REQUEST Khusus', type: 'NOTE', role: 'ADMIN' },
+    { title: 'HAKI diajukan', type: 'TASK', role: 'STAFF' },
+    { title: 'Nomor HAKI keluar', type: 'TASK', role: 'STAFF' },
+    { title: 'Pelunasan', type: 'TASK', role: 'ADMIN' },
+    { title: 'Dikirim ke Mitra/Client', type: 'TASK', role: 'ADMIN' }
+]
+
+// 6. Jasa Cetak
+const jasaCetak: SeedItem[] = [
+    { title: 'DP', type: 'TASK', role: 'ADMIN' },
+    { title: 'Data Masuk (Naskah, Draft)', type: 'TASK', role: 'ADMIN' },
+    { title: 'REQUEST Khusus', type: 'NOTE', role: 'ADMIN' },
+    { title: 'Naskah di ACC Cetak', type: 'TASK', role: 'ADMIN' },
+    { title: 'Detail Alamat Pengiriman Buku Cetakan', type: 'NOTE', role: 'ADMIN' },
+    { title: 'NAIK CETAK', type: 'TASK', role: 'STAFF' },
+    { title: 'Resi Diterima', type: 'TASK', role: 'STAFF' },
+    { title: 'Resi Di Kirim Ke Penulis', type: 'TASK', role: 'ADMIN' }
+]
+
+
+const allProtocols: ProtocolDefinition[] = [
+    {
+        name: 'Protocol Reguler Penerbit KBM',
+        description: 'Standard Operating Procedure (Grouped Flow)',
+        items: kbmReguler
+    },
+    {
+        name: 'Protocol Satuan Mitra Penerbit (SPT)',
+        description: 'Standar Prosedur untuk Mitra SPT',
+        items: sptMitra
+    },
+    {
+        name: 'Jasa Layout',
+        description: 'Flow Jasa Layout',
+        items: jasaLayout
+    },
+    {
+        name: 'Jasa Desain Cover',
+        description: 'Flow Jasa Desain Cover',
+        items: jasaCover
+    },
+    {
+        name: 'Jasa HAKI',
+        description: 'Flow Pengajuan HAKI',
+        items: jasaHaki
+    },
+    {
+        name: 'Jasa Cetak',
+        description: 'Flow Jasa Cetak',
+        items: jasaCetak
+    }
+]
+
+async function main() {
+    console.log('🌱 Starting seed (Multi-Protocols)...')
+
+    // 1. Organization
     const kbmOrg = await prisma.organization.upsert({
         where: { id: '56a6d1cc-04cf-432e-9e31-770e4f2bd5cd' },
         update: {},
@@ -17,133 +286,116 @@ async function main() {
             slug: 'kbm-publisher'
         }
     })
-    console.log('✅ Organization synced:', kbmOrg.name)
 
-    // ==========================================
-    // 1b. CLEANUP EXISTING PROTOCOLS (Idempotency)
-    // ==========================================
-    console.log('🧹 Cleaning up existing KBM protocols to prevent duplicates...')
+    // 2. Cleanup
+    console.log('🧹 Cleaning up existing protocols...')
     await prisma.protocol.deleteMany({
         where: { organizationId: kbmOrg.id }
     })
-    console.log('✅ Previous protocols removed.')
 
-    // ==========================================
-    // HELPERS
-    // ==========================================
-    const createProtocol = async (name: string, description: string, itemsData: { title: string, role: string }[]) => {
+    // 3. Loop through protocols
+    for (const def of allProtocols) {
+        console.log(`\n📌 Creating Protocol: ${def.name}`)
+
         const protocol = await prisma.protocol.create({
             data: {
-                name,
-                description,
-                organizationId: kbmOrg.id,
-                items: {
-                    create: itemsData.map((item, index) => ({
-                        title: item.title,
-                        role: item.role,
-                        order: index,
-                        defaultAssigneeId: null
-                    }))
-                }
+                name: def.name,
+                description: def.description,
+                organizationId: kbmOrg.id
             }
         })
-        console.log(`✅ Protocol created: ${name}`)
 
-        // Link Dependencies
-        const items = await prisma.protocolItem.findMany({
-            where: { protocolId: protocol.id },
-            orderBy: { order: 'asc' }
-        })
+        // Recursive creation
+        let globalOrder = 0
+        let previousItemId: string | null = null
 
-        let createdLinks = 0
-        for (let i = 1; i < items.length; i++) {
-            const prev = items[i - 1]
-            const curr = items[i]
+        const createItemsRecursive = async (items: SeedItem[], parentId: string | null = null) => {
+            for (const item of items) {
+                const createdItem = await prisma.protocolItem.create({
+                    data: {
+                        title: item.title,
+                        type: item.type,
+                        role: item.role || 'ADMIN',
+                        order: globalOrder++,
+                        protocolId: protocol.id,
+                        parentId: parentId
+                    }
+                })
 
-            await prisma.protocolDependency.create({
-                data: {
-                    itemId: curr.id,
-                    prerequisiteId: prev.id
+                // console.log(`   - Created ${item.type}: ${item.title}`)
+
+                // Create Dependency (Sequence)
+                // Dependencies only form between TOP level items, or CHILDREN within the same group.
+                // We don't link Groups to Tasks directly usually, but logic here assumes flat sequence traversal?
+                // Actually, if we traverse hierarchically, dependencies are tricky.
+                // Simplified Logic: 
+                // - Top level items depend on previous Top Level item.
+                // - Children depend on previous Child in the same group.
+
+                if (item.type !== 'GROUP') {
+                    if (previousItemId) {
+                        // Only link if previous item was NOT the Parent (it should separate scope)
+                        // But 'previousItemId' variable is scoped? No, it's global in this loop function.
+                        // Let's rely on the function scope.
+                        // We need 'previousSiblingId' actually.
+                    }
                 }
-            })
-            createdLinks++
+            }
         }
-        console.log(`   🔗 Linked ${createdLinks} dependencies for ${name}`)
+
+        // Better Implementation for Linking: 
+        // We want a Linear Flow: Item 1 -> Item 2 -> Item 3.
+        // If Item 2 is a Group, does Item 3 depend on Item 2 (Group) or the last child of Item 2?
+        // In the app, Groups are just containers. Dependencies usually flow through them or skip them.
+        // Current App Logic: Dependencies are between ITEMS.
+        // Let's implement a Flattened Linear Sequence for dependencies for ease of use?
+        // OR: Sibling dependencies only?
+        // User's previous request implied flow.
+
+        // Let's use a robust Recursive Sibling linker.
+        const createItemsHelpers = async (items: SeedItem[], parentId: string | null = null, lastSiblingId: string | null = null) => {
+            let localPrevId = lastSiblingId;
+
+            for (const item of items) {
+                const createdItem = await prisma.protocolItem.create({
+                    data: {
+                        title: item.title,
+                        type: item.type,
+                        role: item.role || 'ADMIN',
+                        order: globalOrder++,
+                        protocolId: protocol.id, // Fixed: use current protocol.id
+                        parentId: parentId
+                    }
+                });
+
+                // Link to previous sibling
+                if (localPrevId) {
+                    // We link to previous sibling. 
+                    // IMPORTANT: If previous sibling was a GROUP, should we link to it?
+                    // In ProjectBoard, Group Dependencies are hidden!
+                    // But strictly speaking, the Task follows the Group.
+                    // Let's link them. The UI hides buttons but logic remains.
+                    await prisma.protocolDependency.create({
+                        data: { itemId: createdItem.id, prerequisiteId: localPrevId }
+                    });
+                }
+
+                localPrevId = createdItem.id;
+
+                // Children?
+                if (item.children && item.children.length > 0) {
+                    await createItemsHelpers(item.children, createdItem.id, null);
+                    // Children start their own chain (null start), they don't depend on outside yet?
+                    // Actually, first child usually depends on NOTHING (start of group).
+                }
+            }
+        };
+
+        await createItemsHelpers(def.items);
+        console.log(`   ✅ Finished Items for ${def.name}`)
     }
 
-    // ==========================================
-    // 2. CREATE PROTOCOLS
-    // ==========================================
-
-    // Protocol 1: Prosedur Penerbitan Buku (KBM) - EXISTING
-    const itemsData1 = [
-        { title: 'Tanggal naskah masuk', role: 'ADMIN' },
-        { title: 'Tanggal DP (Uang muka masuk, proses dimulai)', role: 'STAFF' },
-        { title: 'REQUEST PENULIS', role: 'ADMIN' },
-        { title: 'Naskah dibagi Ke Kordinator Layout', role: 'STAFF' },
-        { title: 'Layout Selesai', role: 'STAFF' },
-        { title: 'Naskah dibagi Ke Kordinator Cover', role: 'STAFF' },
-        { title: 'Cover Selesai', role: 'STAFF' },
-        { title: 'PERUBAHAN / TAMBAHAN REQUEST PENULIS', role: 'ADMIN' },
-        { title: 'Surat Keaslian diterima dari Penulis', role: 'ADMIN' },
-        { title: 'Pengajuan ISBN/QRCBN/QRSBN', role: 'STAFF' },
-        { title: 'Keluarnya ISBN/QRCBN/QRSBN', role: 'STAFF' },
-        { title: 'ISBN/QRCBN/QRSBN (Nomor diinput)', role: 'STAFF' },
-        { title: 'HAKI diajukan admin', role: 'STAFF' },
-        { title: 'HAKI keluar', role: 'STAFF' },
-        { title: 'Naskah di ACC Cetak Oleh Penulis', role: 'STAFF' },
-        { title: 'Pelunasan (Biasanya wajib lunas sebelum naik cetak)', role: 'STAFF' },
-        { title: 'Alamat Kirim Buku Cetakan', role: 'ADMIN' },
-        { title: 'NAIK CETAK', role: 'STAFF' },
-        { title: 'JotForm dibagi', role: 'ADMIN' },
-        { title: 'Testimoni dibagi', role: 'ADMIN' },
-        { title: 'Sertifikat dibagi', role: 'ADMIN' },
-        { title: 'Upload Playbook', role: 'ADMIN' },
-        { title: 'Link Playbook di Kirim ke Penulis', role: 'ADMIN' },
-        { title: 'Upload Shopee', role: 'ADMIN' },
-        { title: 'Link Shopee di Kirim ke Penulis', role: 'ADMIN' },
-        { title: 'Upload OMP', role: 'ADMIN' },
-        { title: 'Link OMP di Kirim ke Penulis', role: 'ADMIN' },
-        { title: 'Resi Di Kirim Ke Marketing', role: 'STAFF' },
-        { title: 'Resi Di Kirim Ke Penulis', role: 'ADMIN' },
-    ]
-    await createProtocol('Prosedur Penerbitan Buku (KBM)', 'Standard Operating Procedure KBM (Original)', itemsData1)
-
-    // Protocol 2: Satuan Penerbit Terpadu KBM - NEW
-    const itemsData2 = [
-        { title: 'Tanggal naskah masuk', role: 'ADMIN' },
-        { title: 'Tanggal DP', role: 'STAFF' },
-        { title: 'REQUEST PENULIS', role: 'ADMIN' },
-        { title: 'PERUBAHAN / TAMBAHAN REQUEST PENULIS', role: 'ADMIN' },
-        { title: 'Naskah dibagi Ke Kordinator Layout', role: 'STAFF' },
-        { title: 'Layout Selesai', role: 'STAFF' },
-        { title: 'Naskah dibagi Ke Kordinator Cover', role: 'STAFF' },
-        { title: 'Cover Selesai', role: 'STAFF' },
-        { title: 'Surat Keaslian diterima dari Penulis', role: 'ADMIN' },
-        { title: 'ISBN/QRCBN/QRSBN', role: 'STAFF' },
-        { title: 'Pengajuan ISBN/QRCBN/QRSBN', role: 'STAFF' },
-        { title: 'Keluarnya ISBN/QRCBN/QRSBN', role: 'STAFF' },
-        { title: 'HAKI diajukan admin', role: 'STAFF' },
-        { title: 'Nomor HAKI keluar', role: 'STAFF' },
-        { title: 'Naskah di ACC Cetak Oleh Penulis', role: 'STAFF' },
-        { title: 'Alamat Kirim Buku Cetakan', role: 'ADMIN' },
-        { title: 'Tanggal Pelunasan', role: 'STAFF' },
-        { title: 'NAIK CETAK', role: 'STAFF' },
-        { title: 'JotForm dibagi', role: 'ADMIN' }, // Corrected Typo
-        { title: 'Testimoni dibagi', role: 'ADMIN' },
-        { title: 'Sertifikat dibagi', role: 'ADMIN' },
-        { title: 'Upload Playbook', role: 'ADMIN' },
-        { title: 'Link Playbook di Kirim ke Penulis', role: 'ADMIN' },
-        { title: 'Upload Shopee', role: 'ADMIN' },
-        { title: 'Link Shopee di Kirim ke Penulis', role: 'ADMIN' },
-        { title: 'Upload OMP', role: 'ADMIN' },
-        { title: 'Link OMP di Kirim ke Penulis', role: 'ADMIN' },
-        { title: 'Resi Di Kirim Ke Marketing', role: 'STAFF' },
-        { title: 'Resi Di Kirim Ke Penerbit', role: 'ADMIN' },
-    ]
-    await createProtocol('Satuan Penerbit Terpadu KBM', 'Satuan Penerbit Terpadu KBM Workflow', itemsData2)
-
-    console.log('🚀 Seed finished successfully!')
+    console.log('\n🚀 Seed finished successfully!')
 }
 
 main()

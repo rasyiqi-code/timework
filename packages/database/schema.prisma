@@ -179,6 +179,14 @@ model ProjectItem {
   assignedToId String?
   assignedTo   User?   @relation(fields: [assignedToId], references: [id])
 
+  // Sync from Protocol
+  type        ProtocolItemType @default(TASK)
+  order       Int              @default(0)
+  
+  parentId    String?
+  parent      ProjectItem?   @relation("SubProjectTasks", fields: [parentId], references: [id], onDelete: Cascade)
+  children    ProjectItem[]  @relation("SubProjectTasks")
+
   // Dependency Graph
   dependsOn   ItemDependency[] @relation("Dependent")
   requiredBy  ItemDependency[] @relation("Prerequisite")

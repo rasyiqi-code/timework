@@ -3,6 +3,10 @@
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { type Dictionary } from '@/i18n/dictionaries';
+import { Trash2 } from 'lucide-react';
+import { deleteProject } from '@/actions/project';
+import { toast } from 'sonner';
+import { useTransition } from 'react';
 
 interface ProjectTableProps {
     projects: {
@@ -25,6 +29,21 @@ interface ProjectTableProps {
 }
 
 export function ProjectTable({ projects, headers, dict }: ProjectTableProps) {
+    const [isPending, startTransition] = useTransition();
+
+    const handleDelete = (id: string) => {
+        if (confirm('Are you sure you want to delete this project? This cannot be undone.')) {
+            startTransition(async () => {
+                try {
+                    await deleteProject(id);
+                    toast.success('Project deleted');
+                } catch (error) {
+                    toast.error('Failed to delete project');
+                }
+            });
+        }
+    };
+
     if (projects.length === 0) {
         return (
             <div className="text-center py-12 border border-dashed border-slate-300 rounded-xl bg-slate-50 dark:bg-slate-900/50 dark:border-slate-800">
@@ -52,6 +71,9 @@ export function ProjectTable({ projects, headers, dict }: ProjectTableProps) {
                                 {header.title}
                             </th>
                         ))}
+                        <th className="p-4 text-xs font-bold uppercase tracking-wider text-slate-500 text-right sticky right-0 bg-slate-50 z-10 dark:bg-slate-900 dark:text-slate-400">
+                            Actions
+                        </th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -114,6 +136,18 @@ export function ProjectTable({ projects, headers, dict }: ProjectTableProps) {
                                     </td>
                                 );
                             })}
+
+                            {/* Actions Column */}
+                            <td className="p-4 text-right sticky right-0 bg-white z-10 dark:bg-slate-900 border-l border-slate-100 dark:border-slate-800">
+                                <button
+                                    onClick={() => handleDelete(project.id)}
+                                    disabled={isPending}
+                                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors dark:hover:bg-red-900/20"
+                                    title="Delete Project"
+                                >
+                                    <Trash2 size={16} />
+                                </button>
+                            </td>
                         </tr>
                     ))}
                 </tbody>

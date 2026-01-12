@@ -84,7 +84,7 @@ const getCurrentUserImpl = async () => {
                 create: {
                     id: selectedTeam.id,
                     name: selectedTeam.displayName || 'Organization',
-                    slug: (selectedTeam as any).slug || undefined // Handle if slug exists on Stack Team
+                    slug: (selectedTeam as unknown as { slug?: string }).slug || undefined // Handle if slug exists on Stack Team
                 },
                 update: {
                     name: selectedTeam.displayName || 'Organization'

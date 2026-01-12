@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import { updateItemStatus } from '@/actions/project';
 import { useRouter } from 'next/navigation';
 import { AssigneeSelector } from './AssigneeSelector';
+import { FolderOpen, StickyNote, CheckSquare } from 'lucide-react';
 import { type ProjectItem, type ItemDependency } from '@repo/database';
 import { type Dictionary } from '@/i18n/dictionaries';
 
@@ -20,9 +21,10 @@ interface ProjectItemCardProps {
     index: number;
     currentUser: User | null;
     dict: Dictionary;
+    projectOwnerId: string;
 }
 
-export function ProjectItemCard({ item, users, index, currentUser, dict }: ProjectItemCardProps) {
+export function ProjectItemCard({ item, users, index, currentUser, dict, projectOwnerId }: ProjectItemCardProps) {
     const router = useRouter();
     const [isEditMode, setIsEditMode] = useState(false);
     const [isDetailsExpanded, setIsDetailsExpanded] = useState(false);
@@ -35,16 +37,58 @@ export function ProjectItemCard({ item, users, index, currentUser, dict }: Proje
         });
     };
 
+    // Check for Group / Subtask
+    // Note: ProjectItem comes from @repo/database, assume updated types or cast if needed
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const itemType = (item as any).type || 'TASK';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const parentId = (item as any).parentId;
+    const isGroup = itemType === 'GROUP';
+    const isSubtask = !!parentId;
+
+    const isAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'SUPER_ADMIN';
+    const isProjectOwner = currentUser?.id === projectOwnerId;
+    const isAssignedToMe = currentUser?.id === item.assignedToId;
+    const isUnassigned = !item.assignedToId;
+
+    // Permissions:
+    // 1. Full Edit (Title, Assignee, Description): Admin or Project Owner
+    const canEditEverything = isAdmin || isProjectOwner;
+
+    // 2. Details Edit (Description only): Assignee or Unassigned (plus Full Edit users)
+    const canEditDetailsOnly = isAssignedToMe || isUnassigned;
+
+    // General "Can Edit" flag for the toggle button
+    const canEdit = canEditEverything || canEditDetailsOnly;
+
+    if (isGroup) {
+        return (
+            <div key={item.id} className="relative group md:pl-14 py-4 mt-2">
+                {/* Timeline Marker for Group - Just a horizontal line or section break */}
+                <div className="absolute left-[39px] top-1/2 w-3 h-0.5 bg-slate-300 hidden md:block -translate-x-1.5 dark:bg-slate-700"></div>
+
+                <div className="w-full bg-slate-100 border-y border-slate-200 py-2 px-4 flex items-center gap-2 dark:bg-slate-800 dark:border-slate-700">
+                    <FolderOpen size={14} className="text-slate-500 dark:text-slate-400" />
+                    <h3 className="font-black text-xs uppercase tracking-widest text-slate-500 dark:text-slate-400">
+                        {item.title}
+                    </h3>
+                </div>
+            </div>
+        )
+    }
+
     return (
-        <div key={item.id} className="relative group md:pl-14 py-0.5">
-            {/* Timeline Dot / Connector */}
+        <div key={item.id} className={`relative group md:pl-14 py-0.5 ${isSubtask ? 'ml-8 border-l-2 border-slate-100 pl-4 dark:border-slate-800' : ''}`}>
+            {/* Timeline Dot / Connector - Hide for subtasks or style differently? */}
+            {/* If subtask, we might not want the main timeline dot. */}
             <div className={`absolute left-[34px] top-6 w-3 h-3 rounded-full border-2 border-white shadow-sm z-10 hidden md:block
-                ${item.status === 'DONE' ? 'bg-emerald-500 ring-2 ring-emerald-50' :
-                    item.status === 'OPEN' ? 'bg-indigo-500 ring-2 ring-indigo-50' : 'bg-slate-300'}
+                ${isSubtask ? 'w-2 h-2 left-[36px] border-1 bg-slate-400' :
+                    item.status === 'DONE' ? 'bg-emerald-500 ring-2 ring-emerald-50' :
+                        item.status === 'OPEN' ? 'bg-indigo-500 ring-2 ring-indigo-50' : 'bg-slate-300'}
             `}></div>
 
             {/* Connection to Card */}
-            <div className="absolute left-[38px] top-[29px] w-5 h-px bg-slate-200 hidden md:block group-hover:bg-indigo-300 transition-colors"></div>
+            <div className={`absolute left-[38px] top-[29px] w-5 h-px bg-slate-200 hidden md:block group-hover:bg-indigo-300 transition-colors ${isSubtask ? 'w-3' : ''}`}></div>
 
             {/* Compact Card */}
             <div className={`
@@ -55,7 +99,7 @@ export function ProjectItemCard({ item, users, index, currentUser, dict }: Proje
                 }
             `}>
                 {/* Per-Card Edit Toggle - Top Right - Subtle */}
-                {item.status !== 'LOCKED' && currentUser?.role === 'ADMIN' && (
+                {item.status !== 'LOCKED' && canEdit && (
                     <button
                         onClick={() => setIsEditMode(!isEditMode)}
                         className={`absolute top-2 right-2 p-1 rounded hover:bg-slate-100 text-slate-300 hover:text-slate-600 transition-all dark:hover:bg-slate-800 ${isEditMode ? 'text-amber-500 bg-amber-50 dark:bg-amber-900/40' : ''}`}
@@ -76,7 +120,7 @@ export function ProjectItemCard({ item, users, index, currentUser, dict }: Proje
                             }`}></div>
 
                         <div className="min-w-0 flex-1">
-                            {isEditMode ? (
+                            {isEditMode && canEditEverything ? (
                                 <input
                                     type="text"
                                     defaultValue={item.title}
@@ -89,12 +133,17 @@ export function ProjectItemCard({ item, users, index, currentUser, dict }: Proje
                                 />
                             ) : (
                                 <div className="flex items-baseline gap-2">
-                                    <h3 className={`text-sm font-semibold truncate ${item.status === 'LOCKED' ? 'text-slate-500 dark:text-slate-500' : 'text-slate-700 dark:text-slate-200'}`}>
+                                    <h3 className={`text-sm font-semibold truncate flex items-center gap-1.5 ${item.status === 'LOCKED' ? 'text-slate-500 dark:text-slate-500' : 'text-slate-700 dark:text-slate-200'}`}>
+                                        {itemType === 'NOTE' ? (
+                                            <StickyNote size={14} className="text-amber-500 shrink-0" />
+                                        ) : (
+                                            <CheckSquare size={14} className="text-indigo-500 shrink-0" />
+                                        )}
                                         {item.title}
                                     </h3>
-                                    {/* Date (Mock) */}
+                                    {/* Date (Real) */}
                                     <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border bg-slate-100 border-slate-200 text-slate-600 shrink-0 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-400">
-                                        Jan 0{index + 1}
+                                        {new Date(item.updatedAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                                     </span>
                                 </div>
                             )}
@@ -165,20 +214,14 @@ export function ProjectItemCard({ item, users, index, currentUser, dict }: Proje
                                 itemId={item.id}
                                 currentUserId={item.assignedToId}
                                 users={users}
-                                isEditMode={isEditMode}
+                                isEditMode={isEditMode && canEditEverything}
                             />
                         </div>
 
-                        {item.status !== 'LOCKED' && (
+                        {item.status !== 'LOCKED' && !isGroup && (
                             (() => {
-                                const isUnassigned = !item.assignedToId;
-                                const isAssignedToMe = currentUser?.id === item.assignedToId;
-                                const isAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'SUPER_ADMIN';
-                                // Assuming we don't have project Creator ID here yet (passed in props?), but backend handles it.
-                                // For UI, we'll implement: Admin OR Me OR Unassigned.
-                                // If I am NOT Admin, NOT Me, and NOT Unassigned -> Hide button.
-
-                                const canEdit = isAdmin || isAssignedToMe || isUnassigned;
+                                // Permission check uses top-level `canEdit`
+                                if (!canEdit) return null; // Or render disabled button
 
                                 if (!canEdit) return null; // Or render disabled button
 

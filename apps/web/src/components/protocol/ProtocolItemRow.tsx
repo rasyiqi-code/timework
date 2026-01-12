@@ -211,12 +211,12 @@ export function ProtocolItemRow({ item, index, allItems, users }: ProtocolItemRo
                     }`}>
 
                     {/* Top Section: Columns */}
-                    <div className="flex flex-col md:flex-row gap-2 md:items-start">
+                    <div className="flex flex-col md:flex-row gap-2 md:items-center">
 
                         {/* Left: Title & Meta */}
                         <div className="flex-1 min-w-0">
-                            <div className="flex items-start gap-2 mb-1">
-                                <span className={`text-xs font-mono mt-0.5 ${isNote ? 'text-amber-600/50 dark:text-amber-500/50' : 'text-slate-400 dark:text-slate-500'}`}>#{index + 1}</span>
+                            <div className="flex items-center gap-2 mb-1">
+                                <span className={`text-xs font-mono ${isNote ? 'text-amber-600/50 dark:text-amber-500/50' : 'text-slate-400 dark:text-slate-500'}`}>#{index + 1}</span>
                                 <div className="flex-1">
                                     <div className="flex items-center gap-2">
                                         <h4 className={`truncate cursor-pointer hover:underline 
@@ -252,28 +252,30 @@ export function ProtocolItemRow({ item, index, allItems, users }: ProtocolItemRo
 
                         {/* Middle: Dependencies (Show mostly for tasks, but Notes can be dependants too) */}
                         <div className="flex-1 md:border-l md:border-slate-100 md:pl-3 min-w-0 dark:md:border-slate-800">
-                            {item.dependsOn.length > 0 ? (
-                                <div className="flex flex-wrap gap-1">
-                                    {item.dependsOn.map(dep => {
-                                        const prereq = allItems.find(i => i.id === dep.prerequisiteId);
-                                        return (
-                                            <span key={dep.id} className="bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded text-[10px] border border-amber-100 flex items-center gap-1 group/badge truncate max-w-full dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800">
-                                                <span className="truncate">{prereq?.title || '?'}</span>
-                                                <button
-                                                    onClick={() => handleDeleteDependency(dep.id)}
-                                                    className="w-3 h-3 flex items-center justify-center rounded-full hover:bg-amber-200 text-amber-500 hover:text-red-500 opacity-0 group-hover/badge:opacity-100 transition-opacity dark:hover:bg-amber-900/50"
-                                                    title="Remove"
-                                                    type="button"
-                                                    disabled={isPending}
-                                                >
-                                                    ×
-                                                </button>
-                                            </span>
-                                        );
-                                    })}
-                                </div>
-                            ) : (
-                                <span className="text-[10px] text-slate-300 italic dark:text-slate-600">No prerequisites</span>
+                            {!isGroup && (
+                                item.dependsOn.length > 0 ? (
+                                    <div className="flex flex-wrap gap-1">
+                                        {item.dependsOn.map(dep => {
+                                            const prereq = allItems.find(i => i.id === dep.prerequisiteId);
+                                            return (
+                                                <span key={dep.id} className="bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded text-[10px] border border-amber-100 flex items-center gap-1 group/badge truncate max-w-full dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800">
+                                                    <span className="truncate">{prereq?.title || '?'}</span>
+                                                    <button
+                                                        onClick={() => handleDeleteDependency(dep.id)}
+                                                        className="w-3 h-3 flex items-center justify-center rounded-full hover:bg-amber-200 text-amber-500 hover:text-red-500 opacity-0 group-hover/badge:opacity-100 transition-opacity dark:hover:bg-amber-900/50"
+                                                        title="Remove"
+                                                        type="button"
+                                                        disabled={isPending}
+                                                    >
+                                                        ×
+                                                    </button>
+                                                </span>
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <span className="text-[10px] text-slate-300 italic dark:text-slate-600">No prerequisites</span>
+                                )
                             )}
                         </div>
 
@@ -301,26 +303,28 @@ export function ProtocolItemRow({ item, index, allItems, users }: ProtocolItemRo
                             </button>
 
                             {/* Quick Prerequisite Selector */}
-                            <div className="w-24">
-                                <select
-                                    className="w-full py-1 pl-1 pr-4 text-[10px] rounded bg-slate-50 border-0 ring-1 ring-slate-100 focus:ring-indigo-300 text-slate-500 dark:bg-slate-800 dark:text-slate-400 dark:ring-slate-700 disabled:opacity-50"
-                                    onChange={(e) => {
-                                        handleAddDependency(e.target.value);
-                                        e.target.value = ''; // Reset
-                                    }}
-                                    defaultValue=""
-                                    disabled={isPending}
-                                >
-                                    <option value="" disabled>+ Dep</option>
-                                    {allItems
-                                        .filter(i => i.id !== item.id)
-                                        .filter(i => !item.dependsOn.some(d => d.prerequisiteId === i.id))
-                                        .map(i => (
-                                            <option key={i.id} value={i.id}>{i.title}</option>
-                                        ))
-                                    }
-                                </select>
-                            </div>
+                            {!isGroup && (
+                                <div className="w-24">
+                                    <select
+                                        className="w-full py-1 pl-1 pr-4 text-[10px] rounded bg-slate-50 border-0 ring-1 ring-slate-100 focus:ring-indigo-300 text-slate-500 dark:bg-slate-800 dark:text-slate-400 dark:ring-slate-700 disabled:opacity-50"
+                                        onChange={(e) => {
+                                            handleAddDependency(e.target.value);
+                                            e.target.value = ''; // Reset
+                                        }}
+                                        defaultValue=""
+                                        disabled={isPending}
+                                    >
+                                        <option value="" disabled>+ Dep</option>
+                                        {allItems
+                                            .filter(i => i.id !== item.id)
+                                            .filter(i => !item.dependsOn.some(d => d.prerequisiteId === i.id))
+                                            .map(i => (
+                                                <option key={i.id} value={i.id}>{i.title}</option>
+                                            ))
+                                        }
+                                    </select>
+                                </div>
+                            )}
 
                             <button
                                 onClick={() => {
@@ -385,7 +389,7 @@ export function ProtocolItemRow({ item, index, allItems, users }: ProtocolItemRo
     );
 }
 
-function SubtaskForm({ protocolId, parentId, onCancel, users }: { protocolId: string, parentId: string, onCancel: () => void, users: any[] }) {
+function SubtaskForm({ protocolId, parentId, onCancel, users }: { protocolId: string, parentId: string, onCancel: () => void, users: { id: string, name: string | null }[] }) {
     return (
         <form action={async (formData) => {
             formData.append('parentId', parentId);

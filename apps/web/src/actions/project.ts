@@ -9,8 +9,12 @@ import { requireAdmin, getCurrentUser } from '@/actions/auth';
  * Instantiate a new Project from a Protocol Template
  */
 export async function createProjectFromProtocol(protocolId: string, title: string, metadata: Record<string, unknown> | null = null) {
-    const admin = await requireAdmin(); // Enforce Admin check
-    if (!admin.organizationId) throw new Error('No Organization selected');
+    const user = await getCurrentUser(); // Enforce Login check
+    if (!user || !user.organizationId) throw new Error('No Organization selected');
+
+    // Auth Check: Allow Staff, Manager, Admin
+    // const isAdmin = user.role === 'ADMIN' || user.role === 'SUPER_ADMIN'; 
+    // We implicitly allow all authenticated members of an org to create projects for now.
 
     // 1. Fetch Protocol with Items and Dependencies
     const protocol = await prisma.protocol.findUnique({
@@ -25,16 +29,16 @@ export async function createProjectFromProtocol(protocolId: string, title: strin
     });
 
     if (!protocol) throw new Error('Protocol not found');
-    if (protocol.organizationId !== admin.organizationId) throw new Error('Protocol not found (Org mismatch)');
+    if (protocol.organizationId !== user.organizationId) throw new Error('Protocol not found (Org mismatch)');
 
     // 2. Create Project Shell
     const project = await prisma.project.create({
         data: {
             title,
             description: protocol.description,
-            createdById: admin.id,
+            createdById: user.id,
             status: 'ACTIVE',
-            organizationId: admin.organizationId,
+            organizationId: user.organizationId,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             metadata: metadata as any // Save JSON metadata
         }
@@ -55,7 +59,11 @@ export async function createProjectFromProtocol(protocolId: string, title: strin
                 status: 'LOCKED', // Default all to LOCKED initially
                 projectId: project.id,
                 originProtocolItemId: pItem.id,
-                assignedToId: pItem.defaultAssigneeId
+                assignedToId: pItem.defaultAssigneeId,
+
+                type: pItem.type, // Copy type
+
+                order: pItem.order // Copy order
             }
         });
         return { originalId: pItem.id, newItem };
@@ -65,15 +73,31 @@ export async function createProjectFromProtocol(protocolId: string, title: strin
         itemIdMap.set(originalId, newItem.id);
     });
 
-    // Second pass: Create dependencies in parallel
+    // Second pass: Create dependencies AND set Parent Hierarchy
     // We also identify items that have NO dependencies to set them as OPEN
     const dependencyPromises: Promise<unknown>[] = [];
     const openStatusPromises: Promise<unknown>[] = [];
+    const hierarchyPromises: Promise<unknown>[] = [];
 
     for (const pItem of protocol.items) {
         const newDependentId = itemIdMap.get(pItem.id);
         if (!newDependentId) continue;
 
+        // 1. Hierarchy (Parent ID)
+        if (pItem.parentId) {
+            const newParentId = itemIdMap.get(pItem.parentId);
+            if (newParentId) {
+                hierarchyPromises.push(
+                    prisma.projectItem.update({
+                        where: { id: newDependentId },
+
+                        data: { parentId: newParentId }
+                    })
+                );
+            }
+        }
+
+        // 2. Dependencies
         if (pItem.dependsOn.length > 0) {
             // Create dependencies
             const depCreates = pItem.dependsOn.map(dep => {
@@ -91,6 +115,12 @@ export async function createProjectFromProtocol(protocolId: string, title: strin
             dependencyPromises.push(...depCreates);
         } else {
             // No dependencies? It should be OPEN to start
+            // EXCEPTION: Subtasks shouldn't necessarily be OPEN if parent is LOCKED? 
+            // Current logic: If it has no dependencies, it opens. 
+            // Users might want subtasks to unlock only when parent is in progress? 
+            // For now, keep existing logic: No Depends = Open. Subtasks usually depend on parent? 
+            // Actually, usually subtasks don't explicit depend on parent in the model unless we added that.
+            // But visually they are separate. Let's keep strict dependency logic.
             openStatusPromises.push(
                 prisma.projectItem.update({
                     where: { id: newDependentId },
@@ -100,7 +130,7 @@ export async function createProjectFromProtocol(protocolId: string, title: strin
         }
     }
 
-    await Promise.all([...dependencyPromises, ...openStatusPromises]);
+    await Promise.all([...dependencyPromises, ...openStatusPromises, ...hierarchyPromises]);
 
     // 4. Log Creation
     await logProjectAction(project.id, 'PROJECT_CREATED', `Created from protocol: ${protocol.name}`);
@@ -295,7 +325,10 @@ export async function getProjectById(id: string) {
                     },
                     requiredBy: true
                 },
-                orderBy: { title: 'asc' } // temporary sort
+                orderBy: {
+
+                    order: 'asc'
+                }
             }
         }
     });
@@ -433,4 +466,56 @@ export async function updateProjectItemDetails(itemId: string, data: { title?: s
     });
 
     revalidatePath(`/projects/${item.projectId}`);
+}
+
+export async function updateProjectDetails(projectId: string, data: { title?: string, description?: string }) {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) throw new Error('Unauthorized');
+
+    const project = await prisma.project.findUnique({
+        where: { id: projectId },
+        select: { createdById: true, organizationId: true }
+    });
+
+    if (!project) throw new Error('Project not found');
+
+    // Auth Check: Admin, Creator, Manager, or Staff
+    const isAdmin = currentUser.role === 'ADMIN' || currentUser.role === 'SUPER_ADMIN';
+    const isManager = currentUser.role === 'MANAGER';
+    const isStaff = currentUser.role === 'STAFF';
+    const isCreator = project.createdById === currentUser.id;
+
+    if (!isAdmin && !isCreator && !isManager && !isStaff) {
+        throw new Error('Forbidden: You do not have permission to edit details');
+    }
+
+    await prisma.project.update({
+        where: { id: projectId },
+        data: {
+            ...(data.title && { title: data.title }),
+            ...(data.description !== undefined && { description: data.description })
+        }
+    });
+
+    await logProjectAction(projectId, 'PROJECT_UPDATED', `Project details updated`);
+    revalidatePath(`/projects/${projectId}`);
+}
+
+export async function deleteProject(projectId: string) {
+    const admin = await requireAdmin();
+
+    // Ensure the project belongs to the user's organization
+    const project = await prisma.project.findUnique({
+        where: { id: projectId },
+        select: { organizationId: true }
+    });
+
+    if (!project) throw new Error('Project not found');
+    if (project.organizationId !== admin.organizationId) throw new Error('Unauthorized');
+
+    await prisma.project.delete({
+        where: { id: projectId }
+    });
+
+    revalidatePath('/projects');
 }
