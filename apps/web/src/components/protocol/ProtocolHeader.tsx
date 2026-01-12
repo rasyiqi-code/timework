@@ -44,7 +44,7 @@ export function ProtocolHeader({ protocol }: ProtocolHeaderProps) {
 
     if (isEditing) {
         return (
-            <div className="space-y-4 max-w-2xl animate-in fade-in zoom-in-95 duration-200">
+            <div className="space-y-4 w-full animate-in fade-in zoom-in-95 duration-200">
                 <div className="flex flex-col gap-3">
                     <input
                         value={name}
@@ -96,7 +96,7 @@ export function ProtocolHeader({ protocol }: ProtocolHeaderProps) {
                     <Pencil className="w-4 h-4" />
                 </button>
             </h1>
-            <p className="text-slate-500 text-sm max-w-2xl mt-1 dark:text-slate-400">
+            <p className="text-slate-500 text-sm mt-1 dark:text-slate-400">
                 {protocol.description || 'No description provided.'}
             </p>
         </div>

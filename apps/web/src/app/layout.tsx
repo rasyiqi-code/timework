@@ -23,6 +23,7 @@ export const metadata: Metadata = {
 
 import { TooltipProvider } from "@radix-ui/react-tooltip";
 import { OnboardingCheckWrapper } from "@/components/auth/OnboardingCheckWrapper";
+import { Toaster } from "sonner";
 
 export default function RootLayout({
   children,
@@ -77,6 +78,7 @@ export default function RootLayout({
                 <main className="min-h-screen">
                   {children}
                 </main>
+                <Toaster />
               </TooltipProvider>
             </StackTheme>
           </StackProvider>

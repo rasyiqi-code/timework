@@ -40,6 +40,11 @@ export async function Navbar() {
                             {dict.nav.protocols}
                         </Link>
                     )}
+                    {(currentUser?.role === 'ADMIN' || currentUser?.role === 'SUPER_ADMIN') && (
+                        <Link href="/settings/project-form" className="px-3 py-1.5 rounded hover:bg-slate-100 hover:text-slate-900 transition-all dark:hover:bg-slate-800 dark:hover:text-slate-100">
+                            {dict.nav.projectForm}
+                        </Link>
+                    )}
                     {currentUser?.role === 'SUPER_ADMIN' && (
                         <Link href="/super-admin" className="px-3 py-1.5 rounded bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-all font-bold dark:bg-indigo-900/20 dark:text-indigo-400 dark:hover:bg-indigo-900/30">
                             {dict.nav.superAdmin}

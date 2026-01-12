@@ -95,3 +95,41 @@ body {
   -webkit-backdrop-filter: blur(12px);
   /* border-bottom removed to better support rounded elements */
 }
+
+/* Scrollbar visible only on hover */
+.scrollbar-hover {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.scrollbar-hover:hover {
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.dark .scrollbar-hover:hover {
+  scrollbar-color: #334155 transparent;
+}
+
+.scrollbar-hover::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+
+.scrollbar-hover::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-hover::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 9999px;
+}
+
+.scrollbar-hover:hover::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  /* slate-300 */
+}
+
+.dark .scrollbar-hover:hover::-webkit-scrollbar-thumb {
+  background-color: #334155;
+  /* slate-700 */
+}

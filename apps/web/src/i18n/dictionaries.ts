@@ -20,6 +20,7 @@ export const dictionaries = {
             superAdmin: 'Super Admin',
             signIn: 'Masuk',
             signOut: 'Keluar',
+            projectForm: 'Formulir Proyek',
         },
         protocol: {
             titlePlaceholder: 'Ketik judul tugas baru...',
@@ -101,6 +102,7 @@ export const dictionaries = {
             superAdmin: 'Super Admin',
             signIn: 'Sign In',
             signOut: 'Sign Out',
+            projectForm: 'Project Form',
         },
         protocol: {
             titlePlaceholder: 'Type new task title...',

@@ -93,7 +93,7 @@ export function ProjectItemCard({ item, users, index, currentUser, dict }: Proje
                                         {item.title}
                                     </h3>
                                     {/* Date (Mock) */}
-                                    <span className="text-[10px] text-slate-400 font-mono hidden sm:inline-block shrink-0 dark:text-slate-500">
+                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border bg-slate-100 border-slate-200 text-slate-600 shrink-0 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-400">
                                         Jan 0{index + 1}
                                     </span>
                                 </div>

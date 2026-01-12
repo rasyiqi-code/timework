@@ -27,7 +27,7 @@ export default async function ProtocolDetailPage({ params }: { params: { id: str
         <div className="container mx-auto py-12 px-4 space-y-8">
             {/* Breadcrumb / Back */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-200 pb-6 dark:border-slate-800">
-                <div>
+                <div className="flex-1 w-full">
                     {/* Breadcrumb / Back */}
                     <Link
                         href="/admin/protocols"

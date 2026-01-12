@@ -10,6 +10,12 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum ProtocolItemType {
+  TASK
+  NOTE
+  GROUP
+}
+
 // Organization (Tenant)
 model Organization {
   id        String   @id // Will match Stack Team ID
@@ -22,6 +28,19 @@ model Organization {
   activeUsers User[]              // Users who currently have this Org selected
   projects    Project[]
   protocols Protocol[]
+  formTemplate OrganizationFormTemplate?
+}
+
+model OrganizationFormTemplate {
+  id             String       @id @default(cuid())
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  // JSON structure: Array of Field Definitions
+  // [{ key: "sender", label: "Pengirim", type: "text", required: true }, ...]
+  fields         Json
+  
+  updatedAt      DateTime     @updatedAt
 }
 
 // User & Auth
@@ -110,6 +129,7 @@ model Protocol {
 model ProtocolItem {
   id          String   @id @default(cuid())
   title       String
+  type        ProtocolItemType @default(TASK)
   description String?
   role        String?    @default("STAFF") 
   duration    Int      @default(1) // Default duration in days
@@ -120,6 +140,11 @@ model ProtocolItem {
 
   defaultAssigneeId String?
   defaultAssignee   User?   @relation(fields: [defaultAssigneeId], references: [id])
+
+  // Subtasks (Recursive)
+  parentId    String?
+  parent      ProtocolItem?  @relation("SubTasks", fields: [parentId], references: [id], onDelete: Cascade)
+  children    ProtocolItem[] @relation("SubTasks")
 
   // Dependencies within template (Adjacency List)
   dependsOn   ProtocolDependency[] @relation("Dependent")

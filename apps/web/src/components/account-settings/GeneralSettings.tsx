@@ -1,9 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Settings, Moon, Sun, Monitor, Globe, AlertTriangle, ChevronRight, Database, Check, Loader2 } from 'lucide-react';
+import { Settings, Moon, Sun, Monitor, Globe, AlertTriangle, ChevronRight } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { loadDemoDataAction } from '@/actions/seed';
 
 
 export function GeneralSettings() {
@@ -11,40 +10,17 @@ export function GeneralSettings() {
     // const app = useStackApp();
     const [lang, setLang] = useState('en-US');
     const [mounted, setMounted] = useState(false);
-    const [seeding, setSeeding] = useState(false);
-    const [seeded, setSeeded] = useState(false);
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setMounted(true);
-    }, []);
-
-    useEffect(() => {
         const savedLang = localStorage.getItem('timework-language');
-
         if (savedLang) setLang(savedLang);
     }, []);
 
     const handleLangChange = (val: string) => {
         setLang(val);
         localStorage.setItem('timework-language', val);
-    };
-
-    const handleSeed = async () => {
-        if (!confirm('This will insert KBM Demo Data (Dummy Users & Workflow) into your current specific workspace. Continue?')) return;
-
-        setSeeding(true);
-        try {
-            await loadDemoDataAction();
-            setSeeded(true);
-            // alert('Demo data loaded successfully! Check Protocols and Team Members.');
-            // Allow user to see "Success" state briefly
-            setTimeout(() => setSeeded(false), 3000);
-        } catch (e) {
-            console.error(e);
-            alert('Failed to load demo data');
-        } finally {
-            setSeeding(false);
-        }
     };
 
     if (!mounted) return null;

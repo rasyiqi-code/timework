@@ -3,15 +3,17 @@
 import Link from 'next/link';
 import { type Project, type User, type ProjectItem } from '@repo/database';
 import { type Dictionary } from '@/i18n/dictionaries';
+import { type FormField } from '@/actions/form-template';
 
 interface ProjectSidebarProps {
     project: Project & { items: ProjectItem[] };
     users: User[];
     currentUser: User | null;
     dict: Dictionary;
+    fields: FormField[];
 }
 
-export function ProjectSidebar({ project, users, currentUser, dict }: ProjectSidebarProps) {
+export function ProjectSidebar({ project, users, currentUser, dict, fields }: ProjectSidebarProps) {
     const totalItems = project.items.length;
     const completedItems = project.items.filter(i => i.status === 'DONE').length;
     const progress = totalItems === 0 ? 0 : Math.round((completedItems / totalItems) * 100);
@@ -33,6 +35,22 @@ export function ProjectSidebar({ project, users, currentUser, dict }: ProjectSid
                     <p className="text-slate-500 text-xs leading-relaxed dark:text-slate-400">
                         {project.description || dict.project.detail.noDescription}
                     </p>
+
+                    {/* Metadata Section */}
+                    {project.metadata && (
+                        <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 space-y-2">
+                            {fields.map(field => {
+                                const value = (project.metadata as Record<string, unknown>)?.[field.key];
+                                if (!value) return null;
+                                return (
+                                    <div key={field.key} className="flex flex-col">
+                                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{field.label}</span>
+                                        <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">{String(value)}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
 
                 <div className="space-y-3 mb-4 pt-4 border-t border-slate-50 dark:border-slate-800">

@@ -1,7 +1,7 @@
 'use server';
 
 import { prisma } from '@/lib/db';
-import { Prisma } from '@repo/database';
+import { Prisma, ProtocolItemType } from '@repo/database';
 import { revalidatePath } from 'next/cache';
 import { requireAdmin, getCurrentUser } from '@/actions/auth';
 
@@ -45,6 +45,11 @@ export type ProtocolWithDetails = Prisma.ProtocolGetPayload<{
         dependsOn: true;
         requiredBy: true;
         defaultAssignee: true;
+        children: {
+          include: {
+            defaultAssignee: true
+          }
+        };
       };
     };
   };
@@ -63,11 +68,16 @@ export async function getProtocolById(id: string): Promise<ProtocolWithDetails |
     return null;
   }
 
-  // 2. Fetch All Items
+  // 2. Fetch All Items (including subtasks via children relation)
   const items = await prisma.protocolItem.findMany({
     where: { protocolId: id },
     include: {
-      defaultAssignee: true
+      defaultAssignee: true,
+      children: {
+        include: {
+          defaultAssignee: true
+        }
+      }
     },
     orderBy: [
       { order: 'asc' },
@@ -110,6 +120,9 @@ export async function addProtocolItem(protocolId: string, formData: FormData) {
   const title = formData.get('title') as string;
   const duration = parseInt(formData.get('duration') as string) || 1;
   const defaultAssigneeId = formData.get('defaultAssigneeId') as string || null;
+  const type = (formData.get('type') as ProtocolItemType) || 'TASK';
+  const description = formData.get('description') as string || null;
+  const parentId = formData.get('parentId') as string || null;
 
   // Determine next order
   const lastItem = await prisma.protocolItem.findFirst({
@@ -126,7 +139,10 @@ export async function addProtocolItem(protocolId: string, formData: FormData) {
       role: 'STAFF',
       protocolId,
       defaultAssigneeId,
-      order: nextOrder
+      order: nextOrder,
+      type,
+      description,
+      parentId
     }
   });
 
@@ -256,6 +272,8 @@ export async function updateProtocolItem(itemId: string, formData: FormData) {
   const title = formData.get('title') as string;
   const duration = parseInt(formData.get('duration') as string) || 1;
   const defaultAssigneeId = formData.get('defaultAssigneeId') as string || null;
+  const description = formData.get('description') as string || null;
+  const type = (formData.get('type') as ProtocolItemType) || undefined;
 
   if (!title) throw new Error('Title is required');
 
@@ -264,7 +282,9 @@ export async function updateProtocolItem(itemId: string, formData: FormData) {
     data: {
       title,
       duration,
-      defaultAssigneeId: defaultAssigneeId === "" ? null : defaultAssigneeId
+      defaultAssigneeId: defaultAssigneeId === "" ? null : defaultAssigneeId,
+      description,
+      type
     }
   });
 
@@ -319,4 +339,23 @@ export async function moveProtocolItem(itemId: string, direction: 'UP' | 'DOWN')
   ]);
 
   revalidatePath(`/admin/protocols/${item.protocolId}`);
+}
+
+export async function reorderProtocolItems(protocolId: string, newOrderIds: string[]) {
+  await requireAdmin();
+
+  // Use a transaction to ensure all updates happen or none
+  // In SQL, we might use a CASE statement or temp table for bulk updates,
+  // but Prisma doesn't support bulk update with different values natively yet without raw SQL.
+  // For small lists (Protocols usually < 50 steps), individual updates in a transaction are fine.
+
+  const moves = newOrderIds.map((id, index) =>
+    prisma.protocolItem.update({
+      where: { id },
+      data: { order: index }
+    })
+  );
+
+  await prisma.$transaction(moves);
+  revalidatePath(`/admin/protocols/${protocolId}`);
 }

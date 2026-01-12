@@ -8,7 +8,7 @@ import { requireAdmin, getCurrentUser } from '@/actions/auth';
 /**
  * Instantiate a new Project from a Protocol Template
  */
-export async function createProjectFromProtocol(protocolId: string, title: string) {
+export async function createProjectFromProtocol(protocolId: string, title: string, metadata: Record<string, unknown> | null = null) {
     const admin = await requireAdmin(); // Enforce Admin check
     if (!admin.organizationId) throw new Error('No Organization selected');
 
@@ -34,7 +34,9 @@ export async function createProjectFromProtocol(protocolId: string, title: strin
             description: protocol.description,
             createdById: admin.id,
             status: 'ACTIVE',
-            organizationId: admin.organizationId
+            organizationId: admin.organizationId,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            metadata: metadata as any // Save JSON metadata
         }
     });
 
@@ -45,6 +47,7 @@ export async function createProjectFromProtocol(protocolId: string, title: strin
     // First pass: Create all items in parallel to get IDs
     // Note: SQLite might lock if concurrency is too high, but for typical protocols (10-50 items) it's fine.
     const createdItems = await Promise.all(protocol.items.map(async (pItem) => {
+
         const newItem = await prisma.projectItem.create({
             data: {
                 title: pItem.title,
@@ -229,6 +232,51 @@ export async function getProjects() {
             _count: { select: { items: true } }
         }
     });
+}
+
+/**
+ * Fetch Projects for Matrix View (Table)
+ * Returns Projects with items + Normalized Headers (Protocol Steps)
+ */
+export async function getProjectsMatrix() {
+    const user = await getCurrentUser();
+    if (!user || !user.organizationId) return { projects: [], headers: [] };
+
+    // 1. Fetch Projects with Items
+    const projects = await prisma.project.findMany({
+        where: { organizationId: user.organizationId },
+        orderBy: { updatedAt: 'desc' },
+        include: {
+            items: {
+                select: {
+                    id: true,
+                    title: true,
+                    status: true,
+                    updatedAt: true,
+                    originProtocolItemId: true
+                }
+            }
+        }
+    });
+
+    // 2. Determine Columns (Headers)
+    // We want to show columns for tasks that exist across these projects.
+    // Ideally, we look at the Source Protocols.
+    // Strategy: Collect all `originProtocolItemId`, fetch them to get canonical Title and Order.
+    const originIds = new Set<string>();
+    projects.forEach(p => {
+        p.items.forEach(i => {
+            if (i.originProtocolItemId) originIds.add(i.originProtocolItemId);
+        });
+    });
+
+    const headers = await prisma.protocolItem.findMany({
+        where: { id: { in: Array.from(originIds) } },
+        orderBy: { order: 'asc' },
+        select: { id: true, title: true }
+    });
+
+    return { projects, headers };
 }
 
 export async function getProjectById(id: string) {

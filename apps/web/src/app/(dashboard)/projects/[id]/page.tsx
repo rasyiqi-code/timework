@@ -8,6 +8,9 @@ import { notFound } from 'next/navigation';
 import { getDictionary } from '@/i18n/server';
 
 // Ensure this page is always dynamic to show latest statuses
+import { getFormTemplate } from '@/actions/form-template';
+
+// Ensure this page is always dynamic to show latest statuses
 export const dynamic = 'force-dynamic';
 
 export default async function ProjectDetailPage({ params }: { params: { id: string } }) {
@@ -16,13 +19,14 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
     const users = await getUsers();
     const currentUser = await getCurrentUser();
     const dict = await getDictionary();
+    const fields = await getFormTemplate();
 
     if (!project) notFound();
 
     return (
         <div className="w-full px-4 py-8 min-h-screen mb-20">
             <div className="container mx-auto flex flex-col md:flex-row gap-8 items-start">
-                <ProjectSidebar project={project} users={users} currentUser={currentUser} dict={dict} />
+                <ProjectSidebar project={project} users={users} currentUser={currentUser} dict={dict} fields={fields} />
 
                 <main className="flex-1 w-full min-w-0">
                     <div className="animate-in fade-in slide-in-from-bottom-8 duration-700 delay-100">

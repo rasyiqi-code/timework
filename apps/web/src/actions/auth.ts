@@ -2,7 +2,7 @@
 
 import { prisma } from '@/lib/db';
 import { stackServerApp } from '@/stack';
-import { seedOrganizationData } from '@/lib/seed';
+
 
 
 
@@ -24,7 +24,7 @@ const getCurrentUserImpl = async () => {
     const selectedTeam = stackUser.selectedTeam;
     let expectedRole = 'STAFF';
     const expectedOrganizationId = selectedTeam?.id || null;
-    let isNewOrganization = false;
+
 
     // Determine Role
     if (selectedTeam) {
@@ -77,6 +77,21 @@ const getCurrentUserImpl = async () => {
     let finalDbUser = dbUser;
 
     try {
+        // 6a. Sync Organization if needed (Prevent FK Error)
+        if (selectedTeam) {
+            await prisma.organization.upsert({
+                where: { id: selectedTeam.id },
+                create: {
+                    id: selectedTeam.id,
+                    name: selectedTeam.displayName || 'Organization',
+                    slug: (selectedTeam as any).slug || undefined // Handle if slug exists on Stack Team
+                },
+                update: {
+                    name: selectedTeam.displayName || 'Organization'
+                }
+            });
+        }
+
         if (dbUser) {
             // Update
             finalDbUser = await prisma.user.update({
@@ -89,7 +104,6 @@ const getCurrentUserImpl = async () => {
             });
         } else {
             // Create
-            isNewOrganization = !!selectedTeam;
             finalDbUser = await prisma.user.create({
                 data: {
                     email,
@@ -136,27 +150,8 @@ const getCurrentUserImpl = async () => {
         }
     }
 
-    // 7. Seed Organization Data if needed
-    if (expectedOrganizationId && isNewOrganization && finalDbUser) {
-        try {
-            // Only seed if project count is 0 to be safe? 
-            // Or rely on seed function idempotency.
-            // For now, keep original logic: New Org Creation triggers seed.
-            // But wait, 'isNewOrganization' flag above is tricky if we just returned early.
-            // Logic: We only reach here if sync was performed.
-
-            // Check if seeding is actually needed (e.g. check for projects)
-            const projectCount = await prisma.project.count({
-                where: { organizationId: expectedOrganizationId }
-            });
-
-            if (projectCount === 0) {
-                await seedOrganizationData(expectedOrganizationId, finalDbUser.id);
-            }
-        } catch {
-            // ignore seed errors
-        }
-    }
+    // 7. Auto-seeding removed as requested
+    // (User must run seed command manually)
 
     return finalDbUser;
 };
