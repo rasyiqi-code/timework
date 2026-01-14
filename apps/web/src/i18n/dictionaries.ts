@@ -11,6 +11,7 @@ export const dictionaries = {
             edit: 'Ubah',
             loading: 'Memuat...',
             error: 'Terjadi kesalahan',
+            select: 'Pilih',
         },
         nav: {
             brand: 'Timework',
@@ -47,6 +48,11 @@ export const dictionaries = {
             fastTrackDesc: 'Alur kerja yang disederhanakan untuk pesanan satuan.',
             markDone: 'Tandai Selesai',
             endOfWorkflow: 'Akhir Alur Kerja',
+            loadMore: 'Muat Lebih Banyak',
+            loadingMore: 'Memuat...',
+            deleteConfirm: 'Apakah Anda yakin ingin menghapus proyek ini? Tindakan ini tidak dapat dibatalkan.',
+            deleteSuccess: 'Proyek berhasil dihapus',
+            deleteError: 'Gagal menghapus proyek',
             status: {
                 ACTIVE: 'Aktif',
                 COMPLETED: 'Selesai',
@@ -76,6 +82,50 @@ export const dictionaries = {
                 descriptionPlaceholder: 'Deskripsi...',
             }
         },
+        formBuilder: {
+            title: 'Pengaturan Formulir Proyek',
+            subtitle: 'Sesuaikan field data yang diperlukan saat membuat proyek baru.',
+            addField: 'Tambah Field',
+            save: 'Simpan Template',
+            saving: 'Menyimpan...',
+            label: 'Label',
+            key: 'Key (ID)',
+            type: 'Tipe',
+            required: 'Wajib Diisi',
+            options: 'Opsi (pisahkan koma)',
+            remove: 'Hapus Field',
+            types: {
+                text: 'Teks Pendek',
+                number: 'Angka',
+                select: 'Pilihan (Dropdown)',
+                date: 'Tanggal',
+                checkboxGroup: 'Checkbox Group'
+            },
+            placeholders: {
+                label: 'Contoh: Nama Lengkap',
+                key: 'Contoh: full_name',
+                options: 'Opsi A, Opsi B, Opsi C'
+            },
+            validation: {
+                empty: 'Semua field harus memiliki Label dan Key (ID)',
+                success: 'Template formulir berhasil disimpan',
+                error: 'Gagal menyimpan template formulir'
+            }
+        },
+        protocolLibrary: {
+            title: 'Pustaka Protokol',
+            subtitle: 'Standarisasi alur kerja Anda dengan template yang dapat digunakan kembali.',
+            createTitle: 'Buat Protokol Baru',
+            nameLabel: 'Nama',
+            namePlaceholder: 'Contoh: Standar Cetak Buku',
+            descLabel: 'Deskripsi',
+            descPlaceholder: 'Deskripsi protokol...',
+            createButton: 'Buat Protokol',
+            noProtocols: 'Tidak ada protokol ditemukan. Buat satu untuk memulai.',
+            steps: 'Langkah',
+            noDesc: 'Tidak ada deskripsi.',
+            updated: 'Update:',
+        },
         myTasks: {
             title: 'Tugas Aktif Saya',
             subtitle: 'Halo {name}, Anda memiliki {count} tugas aktif.',
@@ -93,6 +143,7 @@ export const dictionaries = {
             edit: 'Edit',
             loading: 'Loading...',
             error: 'Something went wrong',
+            select: 'Select',
         },
         nav: {
             brand: 'Timework',
@@ -112,6 +163,20 @@ export const dictionaries = {
             noSteps: 'No steps defined. Add the first task above.',
             loginTip: '*User must login once to appear.',
         },
+        protocolLibrary: {
+            title: 'Protocol Library',
+            subtitle: 'Standardize your workflows with reusable templates.',
+            createTitle: 'Create New Protocol',
+            nameLabel: 'Name',
+            namePlaceholder: 'e.g., Book Printing Standard',
+            descLabel: 'Description',
+            descPlaceholder: 'Protocol description...',
+            createButton: 'Create Protocol',
+            noProtocols: 'No protocols found. Create one to get started.',
+            steps: 'Steps',
+            noDesc: 'No description provided.',
+            updated: 'Upd:',
+        },
         project: {
             title: 'Active Projects',
             subtitle: "Track progress and manage your team's workflow.",
@@ -129,6 +194,11 @@ export const dictionaries = {
             fastTrackDesc: 'Simplified workflow for Satuan orders.',
             markDone: 'Mark Done',
             endOfWorkflow: 'End of Workflow',
+            loadMore: 'Load More Projects',
+            loadingMore: 'Loading...',
+            deleteConfirm: 'Are you sure you want to delete this project? This cannot be undone.',
+            deleteSuccess: 'Project deleted',
+            deleteError: 'Failed to delete project',
             status: {
                 ACTIVE: 'Active',
                 COMPLETED: 'Completed',
@@ -156,6 +226,36 @@ export const dictionaries = {
                 clickToExpand: 'Click to expand details',
                 clickToCollapse: 'Click to collapse',
                 descriptionPlaceholder: 'Description...',
+            }
+        },
+        formBuilder: {
+            title: 'Project Form Settings',
+            subtitle: 'Customize the data fields required when creating a new project.',
+            addField: 'Add Field',
+            save: 'Save Template',
+            saving: 'Saving...',
+            label: 'Label',
+            key: 'Key (ID)',
+            type: 'Type',
+            required: 'Required Field',
+            options: 'Options (comma separated)',
+            remove: 'Remove Field',
+            types: {
+                text: 'Text Input',
+                number: 'Number Input',
+                select: 'Dropdown (Select)',
+                date: 'Date Picker',
+                checkboxGroup: 'Checkbox Group'
+            },
+            placeholders: {
+                label: 'e.g. Full Name',
+                key: 'e.g. full_name',
+                options: 'Option A, Option B, Option C'
+            },
+            validation: {
+                empty: 'All fields must have a Label and a Key (ID)',
+                success: 'Form template saved successfully',
+                error: 'Failed to save form template'
             }
         },
         myTasks: {

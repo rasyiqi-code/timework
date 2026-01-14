@@ -18,13 +18,13 @@ import type { User } from '@repo/database';
 interface ProjectItemCardProps {
     item: ProjectItemWithRelations;
     users: { id: string, name: string | null }[];
-    index: number;
+
     currentUser: User | null;
     dict: Dictionary;
     projectOwnerId: string;
 }
 
-export function ProjectItemCard({ item, users, index, currentUser, dict, projectOwnerId }: ProjectItemCardProps) {
+export function ProjectItemCard({ item, users, currentUser, dict, projectOwnerId }: ProjectItemCardProps) {
     const router = useRouter();
     const [isEditMode, setIsEditMode] = useState(false);
     const [isDetailsExpanded, setIsDetailsExpanded] = useState(false);

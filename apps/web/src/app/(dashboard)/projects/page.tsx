@@ -9,7 +9,7 @@ import { getFormTemplate } from '@/actions/form-template';
 export const dynamic = 'force-dynamic';
 
 export default async function ProjectsPage() {
-    const { projects, headers } = await getProjectsMatrix();
+    const { projects, headers, nextCursor } = await getProjectsMatrix();
     const protocols = await getProtocols();
     const formFields = await getFormTemplate();
     const dict = await getDictionary();
@@ -21,10 +21,10 @@ export default async function ProjectsPage() {
                     <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-1">{dict.project.title}</h1>
                     <p className="text-slate-500 dark:text-slate-400 text-sm">{dict.project.subtitle}</p>
                 </div>
-                <CreateProjectModal protocols={protocols} dict={dict.project} fields={formFields} />
+                <CreateProjectModal protocols={protocols} dict={dict} fields={formFields} />
             </div>
 
-            <ProjectTable projects={projects} headers={headers} dict={dict.project} />
+            <ProjectTable projects={projects} headers={headers} dict={dict} nextCursor={nextCursor} />
         </div>
     );
 }

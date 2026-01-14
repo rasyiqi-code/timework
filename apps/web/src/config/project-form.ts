@@ -1,5 +1,7 @@
 
-export const PROJECT_FORM_FIELDS = [
+import { type FormField } from '@/actions/form-template';
+
+export const PROJECT_FORM_FIELDS: FormField[] = [
     {
         key: 'sender',
         label: 'Pengirim Naskah',

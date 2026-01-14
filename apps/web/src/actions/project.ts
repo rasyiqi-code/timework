@@ -2,8 +2,14 @@
 
 import { prisma } from '@/lib/db';
 import { revalidatePath } from 'next/cache';
-import { logProjectAction } from '@/actions/audit';
+
 import { requireAdmin, getCurrentUser } from '@/actions/auth';
+import { ProjectService } from '@repo/project-service';
+
+const projectService = new ProjectService(prisma);
+
+import { ProjectSchema } from '@/lib/validation';
+import { z } from 'zod';
 
 /**
  * Instantiate a new Project from a Protocol Template
@@ -12,128 +18,12 @@ export async function createProjectFromProtocol(protocolId: string, title: strin
     const user = await getCurrentUser(); // Enforce Login check
     if (!user || !user.organizationId) throw new Error('No Organization selected');
 
-    // Auth Check: Allow Staff, Manager, Admin
-    // const isAdmin = user.role === 'ADMIN' || user.role === 'SUPER_ADMIN'; 
-    // We implicitly allow all authenticated members of an org to create projects for now.
+    // Validation
+    ProjectSchema.pick({ title: true }).parse({ title });
 
-    // 1. Fetch Protocol with Items and Dependencies
-    const protocol = await prisma.protocol.findUnique({
-        where: { id: protocolId },
-        include: {
-            items: {
-                include: {
-                    dependsOn: true // these are ProtocolDependency
-                }
-            }
-        }
-    });
+    const ctx = { userId: user.id, organizationId: user.organizationId, role: user.role };
 
-    if (!protocol) throw new Error('Protocol not found');
-    if (protocol.organizationId !== user.organizationId) throw new Error('Protocol not found (Org mismatch)');
-
-    // 2. Create Project Shell
-    const project = await prisma.project.create({
-        data: {
-            title,
-            description: protocol.description,
-            createdById: user.id,
-            status: 'ACTIVE',
-            organizationId: user.organizationId,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            metadata: metadata as any // Save JSON metadata
-        }
-    });
-
-    // 3. Map ProtocolItems to ProjectItems (Optimized Parallel Creation)
-    // We need a map to store OldID (ProtocolItem) -> NewID (ProjectItem)
-    const itemIdMap = new Map<string, string>();
-
-    // First pass: Create all items in parallel to get IDs
-    // Note: SQLite might lock if concurrency is too high, but for typical protocols (10-50 items) it's fine.
-    const createdItems = await Promise.all(protocol.items.map(async (pItem) => {
-
-        const newItem = await prisma.projectItem.create({
-            data: {
-                title: pItem.title,
-                description: pItem.description,
-                status: 'LOCKED', // Default all to LOCKED initially
-                projectId: project.id,
-                originProtocolItemId: pItem.id,
-                assignedToId: pItem.defaultAssigneeId,
-
-                type: pItem.type, // Copy type
-
-                order: pItem.order // Copy order
-            }
-        });
-        return { originalId: pItem.id, newItem };
-    }));
-
-    createdItems.forEach(({ originalId, newItem }) => {
-        itemIdMap.set(originalId, newItem.id);
-    });
-
-    // Second pass: Create dependencies AND set Parent Hierarchy
-    // We also identify items that have NO dependencies to set them as OPEN
-    const dependencyPromises: Promise<unknown>[] = [];
-    const openStatusPromises: Promise<unknown>[] = [];
-    const hierarchyPromises: Promise<unknown>[] = [];
-
-    for (const pItem of protocol.items) {
-        const newDependentId = itemIdMap.get(pItem.id);
-        if (!newDependentId) continue;
-
-        // 1. Hierarchy (Parent ID)
-        if (pItem.parentId) {
-            const newParentId = itemIdMap.get(pItem.parentId);
-            if (newParentId) {
-                hierarchyPromises.push(
-                    prisma.projectItem.update({
-                        where: { id: newDependentId },
-
-                        data: { parentId: newParentId }
-                    })
-                );
-            }
-        }
-
-        // 2. Dependencies
-        if (pItem.dependsOn.length > 0) {
-            // Create dependencies
-            const depCreates = pItem.dependsOn.map(dep => {
-                const newPrerequisiteId = itemIdMap.get(dep.prerequisiteId);
-                if (newPrerequisiteId) {
-                    return prisma.itemDependency.create({
-                        data: {
-                            itemId: newDependentId,
-                            prerequisiteId: newPrerequisiteId
-                        }
-                    });
-                }
-                return Promise.resolve();
-            });
-            dependencyPromises.push(...depCreates);
-        } else {
-            // No dependencies? It should be OPEN to start
-            // EXCEPTION: Subtasks shouldn't necessarily be OPEN if parent is LOCKED? 
-            // Current logic: If it has no dependencies, it opens. 
-            // Users might want subtasks to unlock only when parent is in progress? 
-            // For now, keep existing logic: No Depends = Open. Subtasks usually depend on parent? 
-            // Actually, usually subtasks don't explicit depend on parent in the model unless we added that.
-            // But visually they are separate. Let's keep strict dependency logic.
-            openStatusPromises.push(
-                prisma.projectItem.update({
-                    where: { id: newDependentId },
-                    data: { status: 'OPEN' }
-                })
-            );
-        }
-    }
-
-    await Promise.all([...dependencyPromises, ...openStatusPromises, ...hierarchyPromises]);
-
-    // 4. Log Creation
-    await logProjectAction(project.id, 'PROJECT_CREATED', `Created from protocol: ${protocol.name}`);
+    const project = await projectService.createFromProtocol(ctx, protocolId, title, metadata);
 
     revalidatePath('/projects');
     return project;
@@ -149,104 +39,9 @@ export async function createProjectFromProtocol(protocolId: string, title: strin
 export async function updateItemStatus(itemId: string, newStatus: string) {
     const currentUser = await getCurrentUser();
     if (!currentUser) throw new Error('Unauthorized');
+    const ctx = { userId: currentUser.id, organizationId: currentUser.organizationId || '', role: currentUser.role };
 
-    // 1. Fetch item to check ownership
-    // 1. Fetch item to check ownership
-    const itemToCheck = await prisma.projectItem.findUnique({
-        where: { id: itemId },
-        select: {
-            assignedToId: true,
-            project: {
-                select: { createdById: true }
-            }
-        }
-    });
-
-    if (!itemToCheck) throw new Error('Item not found');
-
-    // 2. Enforce Ownership or Admin
-    const isCreator = itemToCheck.project.createdById === currentUser.id;
-    const isAssignee = itemToCheck.assignedToId === currentUser.id;
-    const isUnassigned = itemToCheck.assignedToId === null;
-    const isAdmin = currentUser.role === 'ADMIN' || currentUser.role === 'SUPER_ADMIN';
-
-    if (!isAdmin && !isCreator && !isAssignee && !isUnassigned) {
-        throw new Error('Forbidden: You can only update your own tasks or unassigned tasks');
-    }
-
-    const item = await prisma.projectItem.update({
-        where: { id: itemId },
-        data: { status: newStatus },
-        include: { project: true }
-    });
-
-    await logProjectAction(item.projectId, 'STATUS_CHANGE', `Item "${item.title}" marked as ${newStatus}`);
-
-    // Logic: If status is DONE, check dependents to UNLOCK
-    if (newStatus === 'DONE') {
-        const dependents = await prisma.itemDependency.findMany({
-            where: { prerequisiteId: itemId },
-            include: { item: true }
-        });
-
-        // Optimization: Batch Check
-        // For ALL dependents, we need to know if ALL their prerequisites are met.
-        // We can fetch ALL prerequisites for ALL dependents in one query.
-        const dependentIds = dependents.map((d) => d.item.id);
-
-        if (dependentIds.length > 0) {
-            const allPrereqs = await prisma.itemDependency.findMany({
-                where: { itemId: { in: dependentIds } },
-                include: { prerequisite: true }
-            });
-
-            const updates = [];
-
-            for (const dep of dependents) {
-                const childItem = dep.item;
-                // Filter prereqs for this specific child
-                const childPrereqs = allPrereqs.filter((p) => p.itemId === childItem.id);
-                // Check if all are DONE
-                const allDone = childPrereqs.every((p) => p.prerequisite.status === 'DONE');
-
-                if (allDone) {
-                    updates.push(
-                        prisma.projectItem.update({
-                            where: { id: childItem.id },
-                            data: { status: 'OPEN' }
-                        })
-                    );
-                }
-            }
-
-            await prisma.$transaction(updates);
-        }
-    }
-    // Logic: If status is NOT DONE (e.g. reverted to OPEN/IN_PROGRESS), check dependents to RE-LOCK
-    else {
-        const dependents = await prisma.itemDependency.findMany({
-            where: { prerequisiteId: itemId },
-            include: { item: true }
-        });
-
-        const updates = [];
-
-        for (const dep of dependents) {
-            const childItem = dep.item;
-
-            // If the child was previously unlocked (OPEN/IN_PROGRESS), re-lock it
-            // because one of its prerequisites is no longer DONE.
-            if (childItem.status !== 'DONE' && childItem.status !== 'LOCKED') {
-                updates.push(
-                    prisma.projectItem.update({
-                        where: { id: childItem.id },
-                        data: { status: 'LOCKED' }
-                    })
-                );
-            }
-        }
-        await prisma.$transaction(updates);
-    }
+    const item = await projectService.updateItemStatus(ctx, itemId, newStatus);
 
     revalidatePath(`/projects/${item.projectId}`);
 }
@@ -255,215 +50,74 @@ export async function getProjects() {
     const user = await getCurrentUser();
     if (!user || !user.organizationId) return [];
 
-    return await prisma.project.findMany({
-        where: { organizationId: user.organizationId },
-        orderBy: { updatedAt: 'desc' },
-        include: {
-            _count: { select: { items: true } }
-        }
-    });
+    const ctx = { userId: user.id, organizationId: user.organizationId, role: user.role };
+    return await projectService.getProjects(ctx);
 }
 
 /**
  * Fetch Projects for Matrix View (Table)
  * Returns Projects with items + Normalized Headers (Protocol Steps)
  */
-export async function getProjectsMatrix() {
+export async function getProjectsMatrix(limit: number = 50, cursor?: string) {
     const user = await getCurrentUser();
     if (!user || !user.organizationId) return { projects: [], headers: [] };
 
-    // 1. Fetch Projects with Items
-    const projects = await prisma.project.findMany({
-        where: { organizationId: user.organizationId },
-        orderBy: { updatedAt: 'desc' },
-        include: {
-            items: {
-                select: {
-                    id: true,
-                    title: true,
-                    status: true,
-                    updatedAt: true,
-                    originProtocolItemId: true
-                }
-            }
-        }
-    });
-
-    // 2. Determine Columns (Headers)
-    // We want to show columns for tasks that exist across these projects.
-    // Ideally, we look at the Source Protocols.
-    // Strategy: Collect all `originProtocolItemId`, fetch them to get canonical Title and Order.
-    const originIds = new Set<string>();
-    projects.forEach(p => {
-        p.items.forEach(i => {
-            if (i.originProtocolItemId) originIds.add(i.originProtocolItemId);
-        });
-    });
-
-    const headers = await prisma.protocolItem.findMany({
-        where: { id: { in: Array.from(originIds) } },
-        orderBy: { order: 'asc' },
-        select: { id: true, title: true }
-    });
-
-    return { projects, headers };
+    const ctx = { userId: user.id, organizationId: user.organizationId, role: user.role };
+    return await projectService.getProjectsMatrix(ctx, limit, cursor);
 }
 
 export async function getProjectById(id: string) {
     const user = await getCurrentUser();
     if (!user || !user.organizationId) return null;
 
-    const project = await prisma.project.findUnique({
-        where: { id },
-        include: {
-            items: {
-                include: {
-                    dependsOn: {
-                        include: {
-                            prerequisite: true
-                        }
-                    },
-                    requiredBy: true
-                },
-                orderBy: {
-
-                    order: 'asc'
-                }
-            }
-        }
-    });
-
-    if (project && project.organizationId !== user.organizationId) {
-        return null;
-    }
-
-    return project;
+    const ctx = { userId: user.id, organizationId: user.organizationId, role: user.role };
+    return await projectService.getById(ctx, id);
 }
 
 /**
  * Ad-Hoc Injection: Add a new item to an Active Project
  */
 export async function addProjectItem(projectId: string, title: string, blockedItemId?: string) {
-    await requireAdmin();
-    const newItem = await prisma.projectItem.create({
-        data: {
-            title,
-            projectId,
-            status: 'OPEN', // New ad-hoc items start as OPEN unless we link them immediately
-        }
-    });
+    const admin = await requireAdmin();
 
-    await logProjectAction(projectId, 'ITEM_ADDED', `Ad-hoc item "${title}" added`);
+    const result = z.string().min(1).safeParse(title);
+    if (!result.success) throw new Error("Title is required");
 
-    // If this new item is supposed to block an existing item (Injection Logic)
-    if (blockedItemId) {
-        await addProjectDependency(blockedItemId, newItem.id);
-        await logProjectAction(projectId, 'DEPENDENCY_ADDED', `"${title}" now blocks item ${blockedItemId}`);
-    }
+    const ctx = { userId: admin.id, organizationId: admin.organizationId || '', role: admin.role };
+
+    await projectService.addItem(ctx, projectId, title, blockedItemId);
 
     revalidatePath(`/projects/${projectId}`);
 }
 
 // Helper to check for cycles using DFS (Adapted for Project Items)
-async function detectProjectCycle(itemId: string, prerequisiteId: string): Promise<boolean> {
-    // 1. Get project context
-    const item = await prisma.projectItem.findUnique({
-        where: { id: itemId },
-        select: { projectId: true }
-    });
-
-    if (!item) return false;
-
-    // 2. Fetch all items in the project to build the graph
-    // We could optimize this to only fetch reachable nodes, but for typical project sizes (10-100 items), this is safe.
-    const projectItems = await prisma.projectItem.findMany({
-        where: { projectId: item.projectId },
-        include: { dependsOn: true }
-    });
-
-    // 3. Build Adjacency List
-    // We want to check if 'itemId' is reachable from 'prerequisiteId'
-    const graph = new Map<string, string[]>();
-    projectItems.forEach(i => {
-        // i.dependsOn means i -> depends -> prerequisite
-        const edges = i.dependsOn.map(d => d.prerequisiteId);
-        graph.set(i.id, edges);
-    });
-
-    // 4. DFS from prerequisiteId
-    const visited = new Set<string>();
-    const stack = [prerequisiteId];
-
-    while (stack.length > 0) {
-        const current = stack.pop()!;
-        if (current === itemId) return true; // Cycle detected!
-
-        if (!visited.has(current)) {
-            visited.add(current);
-            const neighbors = graph.get(current) || [];
-            for (const neighbor of neighbors) {
-                stack.push(neighbor);
-            }
-        }
-    }
-
-    return false;
-}
+// detectProjectCycle removed (in service)
 
 /**
  * Ad-Hoc Injection: Create a dependency between two project items
  */
 export async function addProjectDependency(itemId: string, prerequisiteId: string) {
-    await requireAdmin();
+    const admin = await requireAdmin();
+    const ctx = { userId: admin.id, organizationId: admin.organizationId || '', role: admin.role };
 
-    // Prevent self-dependency
-    if (itemId === prerequisiteId) {
-        throw new Error('Cannot depend on self');
-    }
+    const item = await projectService.addDependency(ctx, itemId, prerequisiteId);
 
-    // Check for Cycles
-    const isCycle = await detectProjectCycle(itemId, prerequisiteId);
-    if (isCycle) {
-        throw new Error('Cycle detected: This dependency would create an infinite loop.');
-    }
-
-    // 1. Create the dependency link
-    await prisma.itemDependency.create({
-        data: {
-            itemId,
-            prerequisiteId
-        }
-    });
-
-    // 2. Lock the item if the prerequisite is not DONE
-    // Fix: Do NOT lock if the item is already DONE (don't regress progress)
-    const prerequisite = await prisma.projectItem.findUnique({ where: { id: prerequisiteId } });
-    const item = await prisma.projectItem.findUnique({ where: { id: itemId }, select: { status: true, projectId: true } });
-
-    if (item && item.status !== 'DONE') {
-        if (prerequisite && prerequisite.status !== 'DONE') {
-            await prisma.projectItem.update({
-                where: { id: itemId },
-                data: { status: 'LOCKED' }
-            });
-        }
-    }
-
-    // Explicitly revalidate the project page
-    if (item) {
+    if (item && item.projectId) {
         revalidatePath(`/projects/${item.projectId}`);
     }
 }
 
 export async function updateProjectItemDetails(itemId: string, data: { title?: string, description?: string }) {
-    const item = await prisma.projectItem.update({
-        where: { id: itemId },
-        data: {
-            ...(data.title && { title: data.title }),
-            ...(data.description !== undefined && { description: data.description })
-        },
-        select: { projectId: true }
-    });
+    // Current user check if needed, but for now we assume caller handles auth or service handles it. 
+    // Wait, updateProjectItemDetails had no auth check in original code?! 
+    // Ah, it was probably protected by layout or earlier checks? 
+    // Wait, line 319 in original had `const item = await prisma...`. No auth check.
+    // I should add auth check.
+    const currentUser = await getCurrentUser();
+    if (!currentUser) throw new Error('Unauthorized');
+    const ctx = { userId: currentUser.id, organizationId: currentUser.organizationId || '', role: currentUser.role };
+
+    const item = await projectService.updateItemDetails(ctx, itemId, data);
 
     revalidatePath(`/projects/${item.projectId}`);
 }
@@ -471,51 +125,24 @@ export async function updateProjectItemDetails(itemId: string, data: { title?: s
 export async function updateProjectDetails(projectId: string, data: { title?: string, description?: string }) {
     const currentUser = await getCurrentUser();
     if (!currentUser) throw new Error('Unauthorized');
+    if (!currentUser.organizationId) throw new Error('No Organization');
 
-    const project = await prisma.project.findUnique({
-        where: { id: projectId },
-        select: { createdById: true, organizationId: true }
-    });
+    ProjectSchema.partial().parse(data);
 
-    if (!project) throw new Error('Project not found');
+    const ctx = { userId: currentUser.id, organizationId: currentUser.organizationId, role: currentUser.role };
 
-    // Auth Check: Admin, Creator, Manager, or Staff
-    const isAdmin = currentUser.role === 'ADMIN' || currentUser.role === 'SUPER_ADMIN';
-    const isManager = currentUser.role === 'MANAGER';
-    const isStaff = currentUser.role === 'STAFF';
-    const isCreator = project.createdById === currentUser.id;
+    await projectService.updateDetails(ctx, projectId, data);
 
-    if (!isAdmin && !isCreator && !isManager && !isStaff) {
-        throw new Error('Forbidden: You do not have permission to edit details');
-    }
-
-    await prisma.project.update({
-        where: { id: projectId },
-        data: {
-            ...(data.title && { title: data.title }),
-            ...(data.description !== undefined && { description: data.description })
-        }
-    });
-
-    await logProjectAction(projectId, 'PROJECT_UPDATED', `Project details updated`);
     revalidatePath(`/projects/${projectId}`);
 }
 
 export async function deleteProject(projectId: string) {
     const admin = await requireAdmin();
+    if (!admin.organizationId) throw new Error('No Organization');
 
-    // Ensure the project belongs to the user's organization
-    const project = await prisma.project.findUnique({
-        where: { id: projectId },
-        select: { organizationId: true }
-    });
+    const ctx = { userId: admin.id, organizationId: admin.organizationId, role: admin.role };
 
-    if (!project) throw new Error('Project not found');
-    if (project.organizationId !== admin.organizationId) throw new Error('Unauthorized');
-
-    await prisma.project.delete({
-        where: { id: projectId }
-    });
+    await projectService.delete(ctx, projectId);
 
     revalidatePath('/projects');
 }

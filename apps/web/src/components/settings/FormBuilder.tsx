@@ -1,22 +1,34 @@
 'use client';
-
 import { useState } from 'react';
 import { type FormField } from '@/actions/form-template';
 import { updateFormTemplate } from '@/actions/form-template';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { type Dictionary } from '@/i18n/dictionaries';
 
 interface FormBuilderProps {
     initialFields: FormField[];
+    dict: Dictionary['formBuilder'];
 }
 
-export function FormBuilder({ initialFields }: FormBuilderProps) {
-    const [fields, setFields] = useState<FormField[]>(initialFields);
+type EditableField = FormField & { _id: string };
+
+export function FormBuilder({ initialFields, dict }: FormBuilderProps) {
+    // Initialize with stable IDs
+    const [fields, setFields] = useState<EditableField[]>(() =>
+        initialFields.map(f => ({ ...f, _id: Math.random().toString(36).substring(7) }))
+    );
     const [isSaving, setIsSaving] = useState(false);
     const router = useRouter();
 
     const addField = () => {
-        setFields([...fields, { key: `field_${Date.now()}`, label: 'New Field', type: 'text', required: false }]);
+        setFields([...fields, {
+            key: `field_${Date.now()}`,
+            label: 'New Field',
+            type: 'text',
+            required: false,
+            _id: Math.random().toString(36).substring(7)
+        }]);
     };
 
     const removeField = (index: number) => {
@@ -26,20 +38,33 @@ export function FormBuilder({ initialFields }: FormBuilderProps) {
     };
 
     const updateField = (index: number, key: keyof FormField, value: unknown) => {
-        const newFields = [...fields];
-        newFields[index] = { ...newFields[index], [key]: value };
-        setFields(newFields);
+        setFields(prev => {
+            const newFields = [...prev];
+            newFields[index] = { ...newFields[index], [key]: value };
+            return newFields;
+        });
     };
 
     const handleSave = async () => {
+        // Validation
+        const emptyFields = fields.filter(f => !f.key.trim() || !f.label.trim());
+        if (emptyFields.length > 0) {
+            toast.error(dict.validation.empty);
+            return;
+        }
+
         setIsSaving(true);
         try {
-            await updateFormTemplate(fields);
-            toast.success('Form template saved successfully');
+            // Strip _id before saving
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const cleanFields = fields.map(({ _id, ...rest }) => rest);
+
+            await updateFormTemplate(cleanFields);
+            toast.success(dict.validation.success);
             router.refresh();
         } catch (error) {
             console.error(error);
-            toast.error('Failed to save form template');
+            toast.error(dict.validation.error);
         } finally {
             setIsSaving(false);
         }
@@ -50,35 +75,38 @@ export function FormBuilder({ initialFields }: FormBuilderProps) {
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 shadow-sm">
                 <div className="space-y-4">
                     {fields.map((field, index) => (
-                        <div key={index} className="flex gap-4 items-start p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-100 dark:border-slate-700 group">
+                        <div key={field._id} className="flex gap-4 items-start p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-100 dark:border-slate-700 group">
                             <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <label className="text-[10px] uppercase font-bold text-slate-400 mb-1 block">Label</label>
+                                    <label className="text-[10px] uppercase font-bold text-slate-400 mb-1 block">{dict.label}</label>
                                     <input
-                                        value={field.label}
-                                        onChange={(e) => updateField(index, 'label', e.target.value)}
-                                        className="w-full text-sm rounded-md border-slate-200 py-1.5 px-3 bg-white dark:bg-slate-900 dark:border-slate-700"
+                                        defaultValue={field.label}
+                                        onBlur={(e) => updateField(index, 'label', e.target.value)}
+                                        placeholder={dict.placeholders.label}
+                                        className="w-full text-sm rounded-md border-slate-200 py-1.5 px-3 bg-white dark:bg-slate-900 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none"
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-[10px] uppercase font-bold text-slate-400 mb-1 block">Key (ID)</label>
+                                    <label className="text-[10px] uppercase font-bold text-slate-400 mb-1 block">{dict.key}</label>
                                     <input
-                                        value={field.key}
-                                        onChange={(e) => updateField(index, 'key', e.target.value)}
-                                        className="w-full text-sm rounded-md border-slate-200 py-1.5 px-3 font-mono text-xs bg-slate-100 dark:bg-slate-800 dark:border-slate-700 text-slate-500"
+                                        defaultValue={field.key}
+                                        onBlur={(e) => updateField(index, 'key', e.target.value)}
+                                        placeholder={dict.placeholders.key}
+                                        className="w-full text-sm rounded-md border-slate-200 py-1.5 px-3 font-mono text-xs bg-slate-100 dark:bg-slate-800 dark:border-slate-700 text-slate-500 focus:ring-2 focus:ring-indigo-500 outline-none"
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-[10px] uppercase font-bold text-slate-400 mb-1 block">Type</label>
+                                    <label className="text-[10px] uppercase font-bold text-slate-400 mb-1 block">{dict.type}</label>
                                     <select
-                                        value={field.type}
+                                        defaultValue={field.type}
                                         onChange={(e) => updateField(index, 'type', e.target.value)}
                                         className="w-full text-sm rounded-md border-slate-200 py-1.5 px-3 bg-white dark:bg-slate-900 dark:border-slate-700"
                                     >
-                                        <option value="text">Text Input</option>
-                                        <option value="number">Number Input</option>
-                                        <option value="select">Dropdown (Select)</option>
-                                        <option value="date">Date Picker</option>
+                                        <option value="text">{dict.types.text}</option>
+                                        <option value="number">{dict.types.number}</option>
+                                        <option value="select">{dict.types.select}</option>
+                                        <option value="date">{dict.types.date}</option>
+                                        <option value="checkbox-group">{dict.types.checkboxGroup}</option>
                                     </select>
                                 </div>
                                 <div className="flex items-center pt-6">
@@ -89,18 +117,18 @@ export function FormBuilder({ initialFields }: FormBuilderProps) {
                                             onChange={(e) => updateField(index, 'required', e.target.checked)}
                                             className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                                         />
-                                        Required Field
+                                        {dict.required}
                                     </label>
                                 </div>
 
-                                {field.type === 'select' && (
+                                {(field.type === 'select' || field.type === 'checkbox-group') && (
                                     <div className="col-span-2">
-                                        <label className="text-[10px] uppercase font-bold text-slate-400 mb-1 block">Options (comma separated)</label>
+                                        <label className="text-[10px] uppercase font-bold text-slate-400 mb-1 block">{dict.options}</label>
                                         <input
-                                            value={field.options?.join(', ') || ''}
-                                            onChange={(e) => updateField(index, 'options', e.target.value.split(',').map(s => s.trim()))}
-                                            placeholder="Option A, Option B, Option C"
-                                            className="w-full text-sm rounded-md border-slate-200 py-1.5 px-3 bg-white dark:bg-slate-900 dark:border-slate-700"
+                                            defaultValue={field.options?.join(', ') || ''}
+                                            onBlur={(e) => updateField(index, 'options', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+                                            placeholder={dict.placeholders.options}
+                                            className="w-full text-sm rounded-md border-slate-200 py-1.5 px-3 bg-white dark:bg-slate-900 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none"
                                         />
                                     </div>
                                 )}
@@ -108,6 +136,7 @@ export function FormBuilder({ initialFields }: FormBuilderProps) {
                             <button
                                 onClick={() => removeField(index)}
                                 className="p-2 text-slate-400 hover:text-red-500 hover:bg-white dark:hover:bg-slate-800 rounded-lg transition-colors"
+                                title={dict.remove}
                             >
                                 🗑️
                             </button>
@@ -120,7 +149,7 @@ export function FormBuilder({ initialFields }: FormBuilderProps) {
                         onClick={addField}
                         className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-sm transition-colors dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
                     >
-                        + Add Field
+                        + {dict.addField}
                     </button>
                 </div>
             </div>
@@ -131,7 +160,7 @@ export function FormBuilder({ initialFields }: FormBuilderProps) {
                     disabled={isSaving}
                     className="px-6 py-3 bg-indigo-600 text-white font-bold rounded-xl shadow-lg hover:bg-indigo-700 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                    {isSaving ? 'Saving...' : 'Save Form Template'}
+                    {isSaving ? dict.saving : dict.save}
                 </button>
             </div>
         </div>

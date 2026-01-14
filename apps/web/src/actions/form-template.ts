@@ -8,10 +8,15 @@ import { revalidatePath } from 'next/cache';
 export interface FormField {
     key: string;
     label: string;
-    type: string;
+    type: 'text' | 'number' | 'select' | 'date' | 'checkbox-group';
     placeholder?: string;
     options?: string[]; // For select inputs
     required?: boolean;
+    visibility?: {
+        fieldKey: string;
+        operator: 'eq' | 'neq' | 'in';
+        value: string | string[];
+    };
 }
 
 /**
@@ -34,20 +39,25 @@ export async function getFormTemplate() {
 /**
  * Update the form template for the current admin's organization.
  */
+import { FormTemplateSchema } from '@/lib/validation';
+
 export async function updateFormTemplate(fields: FormField[]) {
     const admin = await requireAdmin();
     if (!admin.organizationId) throw new Error('No Organization selected');
+
+    // Validate Input
+    const validated = FormTemplateSchema.parse({ fields });
 
     await prisma.organizationFormTemplate.upsert({
         where: { organizationId: admin.organizationId },
         create: {
             organizationId: admin.organizationId,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            fields: fields as any
+            fields: validated.fields as any
         },
         update: {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            fields: fields as any
+            fields: validated.fields as any
         }
     });
 

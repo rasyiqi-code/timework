@@ -29,7 +29,7 @@ export function ProjectBoard({ project, users, currentUser, dict }: {
     const sortedItems = (() => {
         // Hierarchical Sort (Respect Protocol Order)
         const items = [...project.items];
-        const itemMap = new Map(items.map(i => [i.id, i]));
+
 
         // 1. Group by Parent
         const childrenMap = new Map<string, typeof items>();
@@ -126,7 +126,7 @@ export function ProjectBoard({ project, users, currentUser, dict }: {
                 {/* Continuous Vertical Line */}
                 <div className="absolute left-[39px] top-4 bottom-4 w-0.5 bg-gradient-to-b from-indigo-200 via-slate-200 to-transparent -z-10 hidden md:block dark:from-indigo-900 dark:via-slate-800"></div>
 
-                {sortedItems.map((item, index) => (
+                {sortedItems.map((item) => (
                     <div key={item.id}>
                         {/* Inline Injection Point */}
                         <GapInjector projectId={project.id} nextItemId={item.id} currentUser={currentUser} />
@@ -134,7 +134,6 @@ export function ProjectBoard({ project, users, currentUser, dict }: {
                         <ProjectItemCard
                             item={item}
                             users={users}
-                            index={index}
                             currentUser={currentUser}
                             dict={dict}
                             projectOwnerId={project.createdById}

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { type Project, type User, type ProjectItem } from '@repo/database';
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useOptimistic } from 'react';
 import { useRouter } from 'next/navigation';
 import { updateProjectDetails } from '@/actions/project';
 import { type Dictionary } from '@/i18n/dictionaries';
@@ -30,13 +30,29 @@ export function ProjectSidebar({ project, users, currentUser, dict, fields }: Pr
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
 
-    const handleSave = (formData: FormData) => {
+    const [optimisticProject, setOptimisticProject] = useOptimistic(
+        project,
+        (state, newValues: { title: string; description: string }) => ({
+            ...state,
+            ...newValues
+        })
+    );
+
+    // Edit State for controlled inputs
+    const [editTitle, setEditTitle] = useState(project.title);
+    const [editDesc, setEditDesc] = useState(project.description || '');
+
+    const handleSave = async (formData: FormData) => {
         const title = formData.get('title') as string;
         const description = formData.get('description') as string;
 
         startTransition(async () => {
-            await updateProjectDetails(project.id, { title, description });
+            // 1. Optimistic Update
+            setOptimisticProject({ title, description });
             setIsEditMode(false);
+
+            // 2. Server Action
+            await updateProjectDetails(project.id, { title, description });
             router.refresh();
         });
     };
@@ -55,7 +71,11 @@ export function ProjectSidebar({ project, users, currentUser, dict, fields }: Pr
                             </span>
                             {canEdit && !isEditMode && (
                                 <button
-                                    onClick={() => setIsEditMode(true)}
+                                    onClick={() => {
+                                        setEditTitle(optimisticProject.title);
+                                        setEditDesc(optimisticProject.description || '');
+                                        setIsEditMode(true);
+                                    }}
                                     className="p-1 text-slate-400 hover:text-indigo-500 transition-colors"
                                     title="Edit Project Details"
                                 >
@@ -69,13 +89,15 @@ export function ProjectSidebar({ project, users, currentUser, dict, fields }: Pr
                         <form action={handleSave} className="space-y-3 mt-2">
                             <input
                                 name="title"
-                                defaultValue={project.title}
+                                value={editTitle}
+                                onChange={(e) => setEditTitle(e.target.value)}
                                 required
                                 className="w-full text-sm font-bold bg-slate-50 border border-indigo-300 rounded px-2 py-1 text-slate-900 focus:ring-2 focus:ring-indigo-500 outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
                             />
                             <textarea
                                 name="description"
-                                defaultValue={project.description || ''}
+                                value={editDesc}
+                                onChange={(e) => setEditDesc(e.target.value)}
                                 rows={3}
                                 className="w-full text-xs bg-slate-50 border border-indigo-300 rounded px-2 py-1 text-slate-600 focus:ring-2 focus:ring-indigo-500 outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300"
                             />
@@ -99,9 +121,9 @@ export function ProjectSidebar({ project, users, currentUser, dict, fields }: Pr
                         </form>
                     ) : (
                         <>
-                            <h1 className="text-lg font-bold text-slate-900 mb-2 leading-tight dark:text-slate-100">{project.title}</h1>
+                            <h1 className="text-lg font-bold text-slate-900 mb-2 leading-tight dark:text-slate-100">{optimisticProject.title}</h1>
                             <p className="text-slate-500 text-xs leading-relaxed dark:text-slate-400 whitespace-pre-wrap">
-                                {project.description || dict.project.detail.noDescription}
+                                {optimisticProject.description || dict.project.detail.noDescription}
                             </p>
                         </>
                     )}

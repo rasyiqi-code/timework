@@ -287,6 +287,109 @@ async function main() {
         }
     })
 
+    // 1b. Form Template (Moved from Code Config to Database)
+    console.log('📝 Seeding Project Form Template...')
+    const defaultFormFields = [
+        // 1. Header Section
+        {
+            key: 'orderCategory',
+            label: 'Kategori Order (Order Category)',
+            type: 'select',
+            options: ['KBM Satuan', 'KBM Reguler', 'SPT KBM'],
+            required: true
+        },
+        {
+            key: 'date',
+            label: 'Tanggal Masuk',
+            type: 'date',
+            required: true
+        },
+
+        // 2. Common Fields
+        {
+            key: 'author',
+            label: 'Nama Penulis (Author)',
+            type: 'text',
+            placeholder: 'Nama Lengkap Penulis',
+            required: true
+        },
+        {
+            key: 'bookTitle',
+            label: 'Judul Buku',
+            type: 'text',
+            placeholder: 'Judul Naskah',
+            required: true
+        },
+
+        // 3. Dynamic Section (Conditional)
+        // IF KBM Satuan -> Show Publisher Name
+        {
+            key: 'publisherName',
+            label: 'Nama Penerbit',
+            type: 'text',
+            placeholder: 'Nama Penerbit (Mitra)',
+            required: true,
+            visibility: {
+                fieldKey: 'orderCategory',
+                operator: 'eq',
+                value: 'KBM Satuan'
+            }
+        },
+        // IF KBM Satuan -> Show Service Types (Checkbox)
+        {
+            key: 'serviceType',
+            label: 'Jenis Orderan (Service Type)',
+            type: 'checkbox-group',
+            options: ['Jasa Layout', 'Jasa Desain Cover', 'Jasa Cetak'],
+            required: false,
+            visibility: {
+                fieldKey: 'orderCategory',
+                operator: 'eq',
+                value: 'KBM Satuan'
+            }
+        },
+        // IF Reguler OR SPT -> Show Package Type
+        {
+            key: 'packageType',
+            label: 'Jenis Paket',
+            type: 'select',
+            options: ['Paket Hemat', 'Paket Premium', 'Paket Lengkap', 'Paket Custom'],
+            required: true,
+            visibility: {
+                fieldKey: 'orderCategory',
+                operator: 'in',
+                value: ['KBM Reguler', 'SPT KBM']
+            }
+        },
+
+        // 4. Footer Section
+        {
+            key: 'quantity',
+            label: 'Jumlah Eksemplar / Satuan',
+            type: 'number',
+            placeholder: '100',
+            required: true
+        },
+        {
+            key: 'size',
+            label: 'Ukuran Buku',
+            type: 'select',
+            options: ['13x19 cm', '14x20 cm', 'A5 (14.8x21)', 'B5 (17.6x25)', 'Custom'],
+            required: true
+        }
+    ];
+
+    await prisma.organizationFormTemplate.upsert({
+        where: { organizationId: kbmOrg.id },
+        create: {
+            organizationId: kbmOrg.id,
+            fields: defaultFormFields
+        },
+        update: {
+            fields: defaultFormFields // Reset to default on seed run? Or keep existing? Usually seed resets or ensures defaults. Let's update.
+        }
+    });
+
     // 2. Cleanup
     console.log('🧹 Cleaning up existing protocols...')
     await prisma.protocol.deleteMany({

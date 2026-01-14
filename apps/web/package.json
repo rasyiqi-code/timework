@@ -15,8 +15,11 @@
     "@oslojs/otp": "^1.1.0",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@repo/database": "workspace:^",
+    "@repo/project-service": "workspace:*",
     "@stackframe/stack": "^2.8.56",
+    "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
+    "geist": "^1.5.1",
     "lucide-react": "^0.562.0",
     "next": "16.1.1",
     "next-themes": "^0.4.6",
@@ -24,7 +27,9 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "server-only": "^0.0.1",
-    "sonner": "^2.0.7"
+    "sonner": "^2.0.7",
+    "tailwind-merge": "^3.4.0",
+    "zod": "^4.3.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.18",

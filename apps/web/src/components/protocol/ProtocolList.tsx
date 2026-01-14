@@ -3,16 +3,18 @@
 import { useRouter } from 'next/navigation';
 import { type Protocol } from '@repo/database';
 import { DeleteProtocolButton } from './DeleteProtocolButton';
+import { type Dictionary } from '@/i18n/dictionaries';
 
 interface ProtocolListProps {
     protocols: (Protocol & { _count: { items: number } })[];
+    dict: Dictionary['protocolLibrary'];
 }
 
-export function ProtocolList({ protocols }: ProtocolListProps) {
+export function ProtocolList({ protocols, dict }: ProtocolListProps) {
     const router = useRouter();
 
     if (protocols.length === 0) {
-        return <div className="text-gray-500 text-center py-8">No protocols found. Create one to get started.</div>;
+        return <div className="text-gray-500 text-center py-8">{dict.noProtocols}</div>;
     }
 
     return (
@@ -30,15 +32,15 @@ export function ProtocolList({ protocols }: ProtocolListProps) {
                                 {protocol.name}
                             </h5>
                             <span className="bg-slate-100 text-slate-500 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider dark:bg-slate-800 dark:text-slate-400">
-                                {protocol._count.items} Steps
+                                {protocol._count.items} {dict.steps}
                             </span>
                         </div>
                         <p className="text-slate-500 mb-4 line-clamp-2 text-xs leading-relaxed h-8 dark:text-slate-400">
-                            {protocol.description || 'No description provided.'}
+                            {protocol.description || dict.noDesc}
                         </p>
                         <div className="flex items-center justify-between border-t border-slate-50 pt-2 dark:border-slate-800">
                             <div className="flex items-center text-[10px] text-slate-400 font-mono dark:text-slate-500">
-                                <span>Upd: {new Date(protocol.updatedAt).toLocaleDateString()}</span>
+                                <span>{dict.updated} {new Date(protocol.updatedAt).toLocaleDateString()}</span>
                             </div>
 
                             {/* Delete Button - Stop Propagation to prevent navigation */}

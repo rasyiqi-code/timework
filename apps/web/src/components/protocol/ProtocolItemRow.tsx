@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useOptimistic } from 'react';
 import { updateProtocolItem, deleteProtocolItem, addDependency, deleteProtocolDependency, addProtocolItem } from '@/actions/protocol';
 import { ProtocolItem, ProtocolDependency } from '@repo/database';
 import { Pencil, Check, X, Trash2, GripVertical, Plus, StickyNote } from 'lucide-react';
@@ -26,10 +26,12 @@ interface ProtocolItemRowProps {
 
 export function ProtocolItemRow({ item, index, allItems, users }: ProtocolItemRowProps) {
     const [isEditing, setIsEditing] = useState(false);
-    const [isSaving, setIsSaving] = useState(false);
+
     const [isPending, startTransition] = useTransition();
-    const [isAddingSubtask, setIsAddingSubtask] = useState(false); // New State for Subtask Form
+    const [isAddingSubtask, setIsAddingSubtask] = useState(false);
     const [showDescription, setShowDescription] = useState(false);
+
+
 
     const {
         attributes,
@@ -40,6 +42,17 @@ export function ProtocolItemRow({ item, index, allItems, users }: ProtocolItemRo
         isDragging
     } = useSortable({ id: item.id });
 
+    const [title, setTitle] = useState(item.title);
+    const [description, setDescription] = useState(item.description || '');
+    const [assigneeId, setAssigneeId] = useState(item.defaultAssigneeId || '');
+    const [type, setType] = useState(item.type);
+
+    // Optimistic UI Hook
+    const [optimisticItem, addOptimisticItem] = useOptimistic(
+        item,
+        (state, newValues: Partial<ItemWithRelations>) => ({ ...state, ...newValues })
+    );
+
     const style = {
         transform: CSS.Transform.toString(transform),
         transition,
@@ -47,30 +60,38 @@ export function ProtocolItemRow({ item, index, allItems, users }: ProtocolItemRo
         opacity: isDragging ? 0.3 : 1,
     };
 
-    // Edit State
-    const [title, setTitle] = useState(item.title);
-    const [description, setDescription] = useState(item.description || ''); // New Description State
-    const [assigneeId, setAssigneeId] = useState(item.defaultAssigneeId || '');
-    const [type, setType] = useState(item.type);
-
     const handleSave = async () => {
-        setIsSaving(true);
-        try {
-            const formData = new FormData();
-            formData.append('title', title);
-            formData.append('description', description); // Append description
-            formData.append('defaultAssigneeId', assigneeId);
-            formData.append('type', type);
+        const selectedUser = users.find(u => u.id === assigneeId);
 
-            await updateProtocolItem(item.id, formData);
+        startTransition(async () => {
+            // 1. Optimistic Update (Instant feedback)
+            addOptimisticItem({
+                title,
+                description,
+                type: type as ProtocolItem['type'],
+                defaultAssigneeId: assigneeId,
+                defaultAssignee: selectedUser ? { id: selectedUser.id, name: selectedUser.name } : null
+            });
+
+            // 2. Close Form UI Immediately
             setIsEditing(false);
-            toast.success('Item updated');
-        } catch (error) {
-            console.error(error);
-            toast.error('Failed to update item');
-        } finally {
-            setIsSaving(false);
-        }
+
+            // 3. Perform Server Action in Background
+            try {
+                const formData = new FormData();
+                formData.append('title', title);
+                formData.append('description', description);
+                formData.append('defaultAssigneeId', assigneeId);
+                formData.append('type', type);
+
+                await updateProtocolItem(item.id, formData);
+                toast.success('Saved');
+            } catch (error) {
+                console.error(error);
+                toast.error('Failed to save');
+                // Revert is automatic when server revalidates, or we could reopen form here ideally
+            }
+        });
     };
 
     const handleCancel = () => {
@@ -169,14 +190,14 @@ export function ProtocolItemRow({ item, index, allItems, users }: ProtocolItemRo
                             <div className="flex gap-1">
                                 <button
                                     onClick={handleSave}
-                                    disabled={isSaving}
+                                    disabled={isPending}
                                     className="px-3 py-1 bg-indigo-600 text-white text-xs font-bold rounded hover:bg-indigo-700 transition-colors flex items-center gap-1"
                                 >
                                     <Check className="w-3.5 h-3.5" /> Save
                                 </button>
                                 <button
                                     onClick={handleCancel}
-                                    disabled={isSaving}
+                                    disabled={isPending}
                                     className="px-3 py-1 bg-slate-200 text-slate-600 text-xs font-bold rounded hover:bg-slate-300 transition-colors dark:bg-slate-700 dark:text-slate-300 flex items-center gap-1"
                                 >
                                     <X className="w-3.5 h-3.5" /> Cancel
@@ -226,9 +247,9 @@ export function ProtocolItemRow({ item, index, allItems, users }: ProtocolItemRo
                                                     ? 'font-bold text-sm text-amber-900 dark:text-amber-100'
                                                     : 'font-bold text-sm text-slate-800 dark:text-slate-200 hover:text-indigo-600'
                                             }`} onClick={() => setIsEditing(true)}>
-                                            {item.title}
+                                            {optimisticItem.title}
                                         </h4>
-                                        {item.description && (
+                                        {optimisticItem.description && (
                                             <button
                                                 onClick={() => setShowDescription(!showDescription)}
                                                 className={`transition-colors p-0.5 rounded ${showDescription ? 'text-indigo-500 bg-indigo-50' : 'text-slate-400 hover:text-indigo-500'}`}
@@ -242,9 +263,9 @@ export function ProtocolItemRow({ item, index, allItems, users }: ProtocolItemRo
                             </div>
 
                             <div className="flex items-center gap-2 pl-6">
-                                {!isGroup && item.defaultAssignee && (
+                                {!isGroup && optimisticItem.defaultAssignee && (
                                     <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100 flex items-center gap-1 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-800">
-                                        👤 {item.defaultAssignee.name}
+                                        👤 {optimisticItem.defaultAssignee.name}
                                     </span>
                                 )}
                             </div>
@@ -253,9 +274,9 @@ export function ProtocolItemRow({ item, index, allItems, users }: ProtocolItemRo
                         {/* Middle: Dependencies (Show mostly for tasks, but Notes can be dependants too) */}
                         <div className="flex-1 md:border-l md:border-slate-100 md:pl-3 min-w-0 dark:md:border-slate-800">
                             {!isGroup && (
-                                item.dependsOn.length > 0 ? (
+                                optimisticItem.dependsOn.length > 0 ? (
                                     <div className="flex flex-wrap gap-1">
-                                        {item.dependsOn.map(dep => {
+                                        {optimisticItem.dependsOn.map(dep => {
                                             const prereq = allItems.find(i => i.id === dep.prerequisiteId);
                                             return (
                                                 <span key={dep.id} className="bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded text-[10px] border border-amber-100 flex items-center gap-1 group/badge truncate max-w-full dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800">
@@ -283,7 +304,7 @@ export function ProtocolItemRow({ item, index, allItems, users }: ProtocolItemRo
                         <div className="flex items-center gap-2 justify-end pt-2 md:pt-0 border-t md:border-t-0 border-slate-50 shrink-0 dark:border-slate-800">
 
                             {/* Add Subtask Button (Only for top-level items) */}
-                            {!item.parentId && (
+                            {!optimisticItem.parentId && (
                                 <button
                                     onClick={() => setIsAddingSubtask(!isAddingSubtask)}
                                     className="p-1.5 rounded transition-colors opacity-0 group-hover:opacity-100 text-slate-300 hover:text-indigo-500 hover:bg-indigo-50 dark:text-slate-600 dark:hover:bg-indigo-900/20"
@@ -316,8 +337,8 @@ export function ProtocolItemRow({ item, index, allItems, users }: ProtocolItemRo
                                     >
                                         <option value="" disabled>+ Dep</option>
                                         {allItems
-                                            .filter(i => i.id !== item.id)
-                                            .filter(i => !item.dependsOn.some(d => d.prerequisiteId === i.id))
+                                            .filter(i => i.id !== optimisticItem.id)
+                                            .filter(i => !optimisticItem.dependsOn.some(d => d.prerequisiteId === i.id))
                                             .map(i => (
                                                 <option key={i.id} value={i.id}>{i.title}</option>
                                             ))
@@ -329,7 +350,7 @@ export function ProtocolItemRow({ item, index, allItems, users }: ProtocolItemRo
                             <button
                                 onClick={() => {
                                     if (confirm("Delete this?")) {
-                                        deleteProtocolItem(item.id);
+                                        deleteProtocolItem(optimisticItem.id);
                                     }
                                 }}
                                 className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors dark:text-slate-600 dark:hover:bg-red-900/20"
@@ -342,10 +363,10 @@ export function ProtocolItemRow({ item, index, allItems, users }: ProtocolItemRo
                     </div>
 
                     {/* Description Full Width */}
-                    {item.description && showDescription && (
+                    {optimisticItem.description && showDescription && (
                         <div className="w-full mt-1 pt-1 border-t border-slate-100 dark:border-slate-800/50">
                             <p className={`text-xs whitespace-pre-wrap p-2 rounded bg-slate-50 border border-slate-100 ${isNote ? 'text-amber-800 bg-amber-50/50 border-amber-100 dark:text-amber-300 dark:bg-amber-900/20 dark:border-amber-800/50' : 'text-slate-600 dark:text-slate-400 dark:bg-slate-800/50 dark:border-slate-700'}`}>
-                                {item.description}
+                                {optimisticItem.description}
                             </p>
                         </div>
                     )}

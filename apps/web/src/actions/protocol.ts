@@ -1,7 +1,7 @@
 'use server';
 
 import { prisma } from '@/lib/db';
-import { Prisma, ProtocolItemType } from '@repo/database';
+import { Prisma } from '@repo/database';
 import { revalidatePath } from 'next/cache';
 import { requireAdmin, getCurrentUser } from '@/actions/auth';
 
@@ -20,17 +20,23 @@ export async function getProtocols() {
   });
 }
 
+import { ProtocolSchema, ProtocolItemSchema } from '@/lib/validation';
+
 export async function createProtocol(formData: FormData) {
   const user = await requireAdmin();
   if (!user.organizationId) throw new Error('No Organization selected');
 
-  const name = formData.get('name') as string;
-  const description = formData.get('description') as string;
+  const rawData = {
+    name: formData.get('name'),
+    description: formData.get('description'),
+  };
+
+  const validated = ProtocolSchema.parse(rawData);
 
   await prisma.protocol.create({
     data: {
-      name,
-      description,
+      name: validated.name,
+      description: validated.description,
       organizationId: user.organizationId,
     },
   });
@@ -61,10 +67,10 @@ export async function getProtocolById(id: string): Promise<ProtocolWithDetails |
 
   // 1. Fetch Protocol Basic Info
   const protocol = await prisma.protocol.findUnique({
-    where: { id },
+    where: { id, organizationId: user.organizationId }, // Scope by Org
   });
 
-  if (!protocol || protocol.organizationId !== user.organizationId) {
+  if (!protocol) {
     return null;
   }
 
@@ -98,9 +104,6 @@ export async function getProtocolById(id: string): Promise<ProtocolWithDetails |
   ]);
 
   // 4. Stitch Data via Map
-  // We need to map dependencies back to their items
-  // Structure: items: { ...item, dependsOn: [], requiredBy: [] }
-
   const optimizedItems = items.map(item => {
     return {
       ...item,
@@ -116,13 +119,24 @@ export async function getProtocolById(id: string): Promise<ProtocolWithDetails |
 }
 
 export async function addProtocolItem(protocolId: string, formData: FormData) {
-  await requireAdmin();
-  const title = formData.get('title') as string;
-  const duration = parseInt(formData.get('duration') as string) || 1;
-  const defaultAssigneeId = formData.get('defaultAssigneeId') as string || null;
-  const type = (formData.get('type') as ProtocolItemType) || 'TASK';
-  const description = formData.get('description') as string || null;
-  const parentId = formData.get('parentId') as string || null;
+  const user = await requireAdmin();
+
+  // Verify Ownership
+  const protocol = await prisma.protocol.findFirst({
+    where: { id: protocolId, organizationId: user.organizationId || '' }
+  });
+  if (!protocol) throw new Error('Protocol not found or unauthorized');
+
+  const rawData = {
+    title: formData.get('title'),
+    duration: formData.get('duration'),
+    defaultAssigneeId: formData.get('defaultAssigneeId') === "" ? null : formData.get('defaultAssigneeId'),
+    type: formData.get('type'),
+    description: formData.get('description'),
+    parentId: formData.get('parentId')
+  };
+
+  const validated = ProtocolItemSchema.parse(rawData);
 
   // Determine next order
   const lastItem = await prisma.protocolItem.findFirst({
@@ -134,15 +148,15 @@ export async function addProtocolItem(protocolId: string, formData: FormData) {
 
   await prisma.protocolItem.create({
     data: {
-      title,
-      duration,
+      title: validated.title,
+      duration: validated.duration,
       role: 'STAFF',
       protocolId,
-      defaultAssigneeId,
+      defaultAssigneeId: validated.defaultAssigneeId,
       order: nextOrder,
-      type,
-      description,
-      parentId
+      type: validated.type,
+      description: validated.description,
+      parentId: validated.parentId
     }
   });
 
@@ -151,7 +165,6 @@ export async function addProtocolItem(protocolId: string, formData: FormData) {
 
 // Helper to check for cycles using DFS
 async function detectCycle(itemId: string, prerequisiteId: string): Promise<boolean> {
-  // 1. Get all items and dependencies for this protocol to build the graph
   const item = await prisma.protocolItem.findUnique({
     where: { id: itemId },
     select: { protocolId: true }
@@ -164,24 +177,18 @@ async function detectCycle(itemId: string, prerequisiteId: string): Promise<bool
     include: { dependsOn: true }
   });
 
-  // Build Adjacency List: id -> [prerequisiteId, prerequisiteId]
-  // We want to check if 'itemId' is reachable from 'prerequisiteId' (because we are adding edge itemId -> prerequisiteId)
-  // If we can reach 'itemId' starting from 'prerequisiteId', then adding this edge closes the loop.
-
   const graph = new Map<string, string[]>();
   protocolItems.forEach(i => {
-    // i.dependsOn means i -> depends -> prerequisite
     const edges = i.dependsOn.map(d => d.prerequisiteId);
     graph.set(i.id, edges);
   });
 
-  // DFS from prerequisiteId to see if we find itemId
   const visited = new Set<string>();
   const stack = [prerequisiteId];
 
   while (stack.length > 0) {
     const current = stack.pop()!;
-    if (current === itemId) return true; // Found a path back to start!
+    if (current === itemId) return true;
 
     if (!visited.has(current)) {
       visited.add(current);
@@ -196,18 +203,23 @@ async function detectCycle(itemId: string, prerequisiteId: string): Promise<bool
 }
 
 export async function addDependency(itemId: string, prerequisiteId: string) {
-  await requireAdmin();
+  const user = await requireAdmin();
 
-  // Prevent self-dependency
+  // Validate Ownership via Protocol
+  const item = await prisma.protocolItem.findFirst({
+    where: {
+      id: itemId,
+      protocol: { organizationId: user.organizationId || '' }
+    }
+  });
+  if (!item) throw new Error('Item not found or unauthorized');
+
   if (itemId === prerequisiteId) {
     throw new Error('Cannot depend on self');
   }
 
-  // Check for Cycles
   const isCycle = await detectCycle(itemId, prerequisiteId);
   if (isCycle) {
-    // Ideally return error string to UI, for now we throw and Server Action catches it or it fails
-    // In a real app we'd use formatted state return.
     throw new Error('Cycle detected: This dependency would create an infinite loop.');
   }
 
@@ -218,16 +230,16 @@ export async function addDependency(itemId: string, prerequisiteId: string) {
     },
   });
 
-  const item = await prisma.protocolItem.findUnique({ where: { id: itemId } });
-  if (item) {
-    revalidatePath(`/admin/protocols/${item.protocolId}`);
-  }
+  revalidatePath(`/admin/protocols/${item.protocolId}`);
 }
 
 export async function deleteProtocolDependency(dependencyId: string) {
-  await requireAdmin();
-  const dep = await prisma.protocolDependency.findUnique({
-    where: { id: dependencyId },
+  const user = await requireAdmin();
+  const dep = await prisma.protocolDependency.findFirst({
+    where: {
+      id: dependencyId,
+      item: { protocol: { organizationId: user.organizationId || '' } }
+    },
     include: { item: true }
   });
 
@@ -238,8 +250,13 @@ export async function deleteProtocolDependency(dependencyId: string) {
 }
 
 export async function deleteProtocolItem(itemId: string) {
-  await requireAdmin();
-  const item = await prisma.protocolItem.findUnique({ where: { id: itemId } });
+  const user = await requireAdmin();
+  const item = await prisma.protocolItem.findFirst({
+    where: {
+      id: itemId,
+      protocol: { organizationId: user.organizationId || '' }
+    }
+  });
   if (!item) return;
 
   await prisma.protocolItem.delete({ where: { id: itemId } });
@@ -247,44 +264,73 @@ export async function deleteProtocolItem(itemId: string) {
 }
 
 export async function deleteProtocol(id: string) {
-  await requireAdmin();
+  const user = await requireAdmin();
+  // Ensure protocol belongs to user's org
+  const existing = await prisma.protocol.findFirst({
+    where: { id, organizationId: user.organizationId || '' }
+  });
+  if (!existing) throw new Error('Unauthorized or not found');
+
   await prisma.protocol.delete({ where: { id } });
   revalidatePath('/admin/protocols');
 }
 
 export async function updateProtocol(id: string, formData: FormData) {
-  await requireAdmin();
-  const name = formData.get('name') as string;
-  const description = formData.get('description') as string;
+  const user = await requireAdmin();
 
-  if (!name) throw new Error('Name is required');
+  const rawData = {
+    name: formData.get('name'),
+    description: formData.get('description'),
+  };
+
+  const validated = ProtocolSchema.parse(rawData);
+
+  // Validate Ownership
+  const existing = await prisma.protocol.findFirst({
+    where: { id, organizationId: user.organizationId || '' }
+  });
+  if (!existing) throw new Error('Unauthorized or not found');
 
   await prisma.protocol.update({
     where: { id },
-    data: { name, description }
+    data: { name: validated.name, description: validated.description }
   });
 
   revalidatePath(`/admin/protocols/${id}`);
 }
 
 export async function updateProtocolItem(itemId: string, formData: FormData) {
-  await requireAdmin();
-  const title = formData.get('title') as string;
-  const duration = parseInt(formData.get('duration') as string) || 1;
-  const defaultAssigneeId = formData.get('defaultAssigneeId') as string || null;
-  const description = formData.get('description') as string || null;
-  const type = (formData.get('type') as ProtocolItemType) || undefined;
+  const user = await requireAdmin();
 
-  if (!title) throw new Error('Title is required');
+  const rawData = {
+    title: formData.get('title'),
+    duration: formData.get('duration'),
+    defaultAssigneeId: formData.get('defaultAssigneeId') === "" ? null : formData.get('defaultAssigneeId'),
+    type: formData.get('type'),
+    description: formData.get('description'),
+    parentId: formData.get('parentId') // Usually not updated here but schema has it
+  };
 
-  const item = await prisma.protocolItem.update({
+  // We actully don't update parentId here often via FormData in basic edit, but if sent it's validated.
+  const validated = ProtocolItemSchema.parse(rawData);
+
+  // Verify Ownership
+  const item = await prisma.protocolItem.findFirst({
+    where: {
+      id: itemId,
+      protocol: { organizationId: user.organizationId || '' }
+    }
+  });
+  if (!item) throw new Error('Item not found or unauthorized');
+
+  await prisma.protocolItem.update({
     where: { id: itemId },
     data: {
-      title,
-      duration,
-      defaultAssigneeId: defaultAssigneeId === "" ? null : defaultAssigneeId,
-      description,
-      type
+      title: validated.title,
+      duration: validated.duration,
+      defaultAssigneeId: validated.defaultAssigneeId,
+      description: validated.description,
+      type: validated.type
     }
   });
 
@@ -292,14 +338,17 @@ export async function updateProtocolItem(itemId: string, formData: FormData) {
 }
 
 export async function moveProtocolItem(itemId: string, direction: 'UP' | 'DOWN') {
-  await requireAdmin();
+  const user = await requireAdmin();
 
-  const item = await prisma.protocolItem.findUnique({
-    where: { id: itemId },
+  const item = await prisma.protocolItem.findFirst({
+    where: {
+      id: itemId,
+      protocol: { organizationId: user.organizationId || '' }
+    },
     select: { id: true, protocolId: true, order: true }
   });
 
-  if (!item) throw new Error('Item not found');
+  if (!item) throw new Error('Item not found or unauthorized');
 
   // Find adjacent item
   const adjacentItem = await prisma.protocolItem.findFirst({
@@ -315,14 +364,6 @@ export async function moveProtocolItem(itemId: string, direction: 'UP' | 'DOWN')
   });
 
   if (!adjacentItem) {
-    // If no adjacent item found via order, fallback to basic swap based on title/created? 
-    // Or just return.
-    // For now, simpler: if orders are 0 (default), we might need to initialize them.
-    // But let's assume they are somewhat ordered or unique. 
-    // IF all orders are 0, this logic will fail to find "lt" 0 or "gt" 0 if there's no distinction.
-
-    // Hack: If orders are equal, we can try to "nudge" them by assigning distinct orders based on current list position.
-    // But that's expensive.
     return;
   }
 
@@ -342,12 +383,30 @@ export async function moveProtocolItem(itemId: string, direction: 'UP' | 'DOWN')
 }
 
 export async function reorderProtocolItems(protocolId: string, newOrderIds: string[]) {
-  await requireAdmin();
+  const user = await requireAdmin();
 
-  // Use a transaction to ensure all updates happen or none
-  // In SQL, we might use a CASE statement or temp table for bulk updates,
-  // but Prisma doesn't support bulk update with different values natively yet without raw SQL.
-  // For small lists (Protocols usually < 50 steps), individual updates in a transaction are fine.
+  // Validate Protocol Ownership
+  const protocol = await prisma.protocol.findFirst({
+    where: { id: protocolId, organizationId: user.organizationId || '' }
+  });
+  if (!protocol) throw new Error('Protocol not found or unauthorized');
+
+  // Validate all items belong to this protocol (Implicitly checks ownership if protocol is owned)
+  // Actually, for maximum security, we should check items. But checking protocol is good enough as items are scoped to protocol.
+  // HOWEVER, a user could theoretically pass OrderIds from another protocol?
+  // Prisma update { where: { id } } will work globally.
+  // We MUST ensure the IDs in `newOrderIds` actually belong to `protocolId`.
+
+  const count = await prisma.protocolItem.count({
+    where: {
+      id: { in: newOrderIds },
+      protocolId: protocolId
+    }
+  });
+
+  if (count !== newOrderIds.length) {
+    throw new Error('Invalid Item IDs provided for reorder');
+  }
 
   const moves = newOrderIds.map((id, index) =>
     prisma.protocolItem.update({
