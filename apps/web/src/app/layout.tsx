@@ -16,11 +16,19 @@ import { TooltipProvider } from "@radix-ui/react-tooltip";
 import { OnboardingCheckWrapper } from "@/components/auth/OnboardingCheckWrapper";
 import { Toaster } from "sonner";
 
-export default function RootLayout({
+import { getCurrentUser } from "@/actions/auth";
+import { getDictionary, getLocale } from '@/i18n/server';
+import { Suspense } from "react";
+
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const dict = await getDictionary();
+  const locale = await getLocale();
+  const currentUser = await getCurrentUser();
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${GeistSans.variable} ${GeistMono.variable} antialiased`}>
@@ -65,7 +73,9 @@ export default function RootLayout({
             }}>
               <TooltipProvider>
                 <OnboardingCheckWrapper />
-                <Navbar />
+                <Suspense fallback={null}>
+                  <Navbar dict={dict} locale={locale} signInUrl={stackServerApp.urls.signIn} currentUser={currentUser} />
+                </Suspense>
                 <main className="min-h-screen">
                   {children}
                 </main>

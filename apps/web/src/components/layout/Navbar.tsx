@@ -1,16 +1,24 @@
+'use client';
+
 import Link from 'next/link';
-import { getCurrentUser } from '@/actions/auth';
 import { ThemeToggle } from '../theme/ThemeToggle';
-import { UserButton } from "@stackframe/stack";
-import { stackServerApp } from "@/stack";
+import { UserButton, useUser } from "@stackframe/stack";
 
-import { getDictionary, getLocale } from '@/i18n/server';
 import { LanguageToggle } from '../language/LanguageToggle';
+import { usePathname } from 'next/navigation';
+import { Dictionary } from '@/i18n/dictionaries'; // Assuming Dictionary type is needed for props
 
-export async function Navbar() {
-    const currentUser = await getCurrentUser();
-    const dict = await getDictionary();
-    const locale = await getLocale();
+// Navbar now expects dict and locale as props, as it's a client component
+export function Navbar({ dict, locale, signInUrl, currentUser }: {
+    dict: Dictionary,
+    locale: string,
+    signInUrl: string,
+    currentUser: any // Using any strictly to bypass the immediate type errors, relying on the prop passed from server
+}) {
+    const pathname = usePathname();
+
+    // Hide global navbar on landing page (root)
+    if (pathname === '/') return null;
 
     return (
         <div className="sticky top-0 z-50 w-full bg-white/80 backdrop-blur-md border-b border-slate-200 dark:bg-slate-900/80 dark:border-slate-800">
@@ -53,7 +61,7 @@ export async function Navbar() {
                 </div>
 
                 <div className="flex items-center gap-4">
-                    <LanguageToggle currentLocale={locale} />
+                    <LanguageToggle currentLocale={locale as "id" | "en"} />
                     <ThemeToggle />
                     {currentUser ? (
                         <div className="flex items-center gap-2">
@@ -64,7 +72,7 @@ export async function Navbar() {
                         </div>
                     ) : (
                         <Link
-                            href={stackServerApp.urls.signIn}
+                            href={signInUrl}
                             className="text-xs font-bold px-3 py-1.5 rounded bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
                         >
                             {dict.nav.signIn}

@@ -15,12 +15,16 @@ export const dictionaries = {
         },
         nav: {
             brand: 'Timework',
+            features: 'Fitur',
+            howItWorks: 'Cara Kerja',
+            faq: 'FAQ',
             projects: 'Proyek',
             myTasks: 'Tugas Saya',
             protocols: 'Protokol',
             superAdmin: 'Super Admin',
             signIn: 'Masuk',
             signOut: 'Keluar',
+            getStarted: 'Mulai Sekarang',
             projectForm: 'Formulir Proyek',
         },
         protocol: {
@@ -132,7 +136,75 @@ export const dictionaries = {
             allCaughtUp: 'Semua beres!',
             noActiveTasks: 'Tidak ada tugas aktif yang diberikan kepada Anda.',
             openProject: 'Buka Proyek →'
-        }
+        },
+        home: {
+            badge: 'v1.0 sekarang live',
+            title: 'Sistem Kerja Otomatis.',
+            titleHighlight: 'Tanpa Drama Koordinasi.',
+            subtitle: 'Timework menghubungkan tugas dalam rangkaian cerdas. Saat satu tugas selesai, tugas berikutnya terbuka otomatis. Bye-bye meeting status update.',
+            openProjects: 'Mulai Sekarang',
+            viewProtocols: 'Lihat Contoh',
+            features: {
+                title: 'Sistem Kerja Cerdas',
+                subtitle: 'Semua yang Anda butuhkan untuk menyelesaikan proyek lebih cepat.',
+                standardized: {
+                    title: 'Protokol Anti Lupa',
+                    desc: 'Ubah SOP rumit menjadi template checklist yang mustahil dilewatkan.'
+                },
+                dependencies: {
+                    title: 'Kunci & Buka Otomatis',
+                    desc: 'Jangan kerjakan langkah B sebelum A selesai. Sistem yang menjaga urutan kerja Anda.'
+                },
+                parallel: {
+                    title: 'Kerja Paralel',
+                    desc: 'Semua orang tahu apa yang harus dikerjakan sekarang, tanpa perlu ditanya.'
+                }
+            },
+            howItWorks: {
+                title: 'Cara Kerja',
+                subtitle: 'Sederhana, namun powerful.',
+                steps: {
+                    define: {
+                        title: '1. Definisikan',
+                        desc: 'Buat template protokol sekali saja. Tentukan langkah dan ketergantungan.'
+                    },
+                    execute: {
+                        title: '2. Eksekusi',
+                        desc: 'Mulai proyek dari template. Tim langsung mendapatkan tugas mereka.'
+                    },
+                    automate: {
+                        title: '3. Otomatisasi',
+                        desc: 'Sistem membuka tugas selanjutnya secara otomatis saat prasyarat terpenuhi.'
+                    }
+                }
+            },
+            faq: {
+                title: 'Pertanyaan Umum',
+                items: {
+                    free: {
+                        q: 'Apakah ini gratis?',
+                        a: 'Ya, Timework gratis untuk penggunaan individu dan tim kecil. Kami ingin membantu Anda bekerja lebih efisien.'
+                    },
+                    team: {
+                        q: 'Bisakah saya mengundang tim?',
+                        a: 'Tentu saja. Anda dapat mengundang anggota tim tanpa batas ke dalam proyek Anda.'
+                    },
+                    limit: {
+                        q: 'Apakah ada batasan proyek?',
+                        a: 'Saat ini tidak ada batasan jumlah proyek yang dapat Anda buat.'
+                    }
+                }
+            },
+            footer: {
+                brand: 'Timework',
+                desc: 'Standar baru untuk operasional tim.',
+                copyright: '© 2024 Timework. All rights reserved.',
+                links: {
+                    twitter: 'Twitter',
+                    github: 'GitHub'
+                }
+            }
+        },
     },
     en: {
         common: {
@@ -147,12 +219,16 @@ export const dictionaries = {
         },
         nav: {
             brand: 'Timework',
+            features: 'Features',
+            howItWorks: 'How it Works',
+            faq: 'FAQ',
             projects: 'Projects',
             myTasks: 'My Tasks',
             protocols: 'Protocols',
             superAdmin: 'Super Admin',
             signIn: 'Sign In',
             signOut: 'Sign Out',
+            getStarted: 'Get Started',
             projectForm: 'Project Form',
         },
         protocol: {
@@ -264,6 +340,74 @@ export const dictionaries = {
             allCaughtUp: 'All caught up!',
             noActiveTasks: 'No active tasks assigned to you.',
             openProject: 'Open Project →'
+        },
+        home: {
+            badge: 'v1.0 is now live',
+            title: 'Automated Operations.',
+            titleHighlight: 'Zero Coordination.',
+            subtitle: 'Timework turns your SOPs into executable protocols. When one step finishes, the next unlocks automatically. No more checking in.',
+            openProjects: 'Start Shipping',
+            viewProtocols: 'See Examples',
+            features: {
+                title: 'Supercharge your workflow',
+                subtitle: 'Everything you need to ship projects faster, all in one place.',
+                standardized: {
+                    title: 'Impossible to Forget',
+                    desc: 'Complex workflows become simple checklists. Ensure quality without micromanagement.'
+                },
+                dependencies: {
+                    title: 'Auto-Unlock',
+                    desc: 'Tasks remain locked until prerequisites are met. Prevents skipping steps and confusion.'
+                },
+                parallel: {
+                    title: 'Visual Progress',
+                    desc: 'See exactly where every project is stuck. Eliminate bottlenecks instantly.'
+                }
+            },
+            howItWorks: {
+                title: 'How it Works',
+                subtitle: 'Simple, yet powerful.',
+                steps: {
+                    define: {
+                        title: '1. Define',
+                        desc: 'Create a protocol template once. Set steps and dependencies.'
+                    },
+                    execute: {
+                        title: '2. Execute',
+                        desc: 'Start a project from the template. Your team gets assigned instantly.'
+                    },
+                    automate: {
+                        title: '3. Automate',
+                        desc: 'The system unlocks the next tasks automatically when prerequisites are met.'
+                    }
+                }
+            },
+            faq: {
+                title: 'Frequently Asked Questions',
+                items: {
+                    free: {
+                        q: 'Is it free?',
+                        a: 'Yes, Timework is free for individuals and small teams. We want to help you work efficiently.'
+                    },
+                    team: {
+                        q: 'Can I invite my team?',
+                        a: 'Absolutely. You can invite unlimited team members to your projects.'
+                    },
+                    limit: {
+                        q: 'Are there project limits?',
+                        a: 'There are currently no limits on the number of projects you can create.'
+                    }
+                }
+            },
+            footer: {
+                brand: 'Timework',
+                desc: 'The new standard for team operations.',
+                copyright: '© 2024 Timework. All rights reserved.',
+                links: {
+                    twitter: 'Twitter',
+                    github: 'GitHub'
+                }
+            }
         }
-    },
+    }
 };
