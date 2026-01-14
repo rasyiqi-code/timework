@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import "./globals.css";
@@ -7,9 +7,48 @@ import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { StackProvider, StackTheme } from "@stackframe/stack";
 import { stackServerApp } from "@/stack";
 
+export const viewport: Viewport = {
+  themeColor: "#4f46e5",
+};
+
 export const metadata: Metadata = {
-  title: "Timework",
-  description: "Protocol-Driven Project Management",
+  title: {
+    default: "Timework | Protocol-Driven Project Management",
+    template: "%s | Timework",
+  },
+  description: "Timework is the enterprise-standard project management platform built for protocol-driven workflows. Streamline your operations with precision and clarity.",
+  keywords: ["Project Management", "Protocol", "Enterprise", "SaaS", "Workflow", "Productivity", "Timework"],
+  authors: [{ name: "Timework Team" }],
+  creator: "Timework",
+  metadataBase: new URL("https://timework.dev"), // Replace with actual domain in production or env var
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: "https://timework.dev",
+    siteName: "Timework",
+    title: "Timework | Protocol-Driven Project Management",
+    description: "Enterprise-standard project management for protocol-driven workflows.",
+    images: [
+      {
+        url: "/timework_dashboard_hero.png", // Assuming existing asset or will be created
+        width: 1200,
+        height: 630,
+        alt: "Timework Dashboard",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Timework | Protocol-Driven Project Management",
+    description: "Enterprise-standard project management for protocol-driven workflows.",
+    creator: "@timework",
+    images: ["/timework_dashboard_hero.png"],
+  },
+  icons: {
+    icon: "/icon.svg",
+    apple: "/icon.svg",
+    shortcut: "/icon.svg",
+  },
 };
 
 import { TooltipProvider } from "@radix-ui/react-tooltip";

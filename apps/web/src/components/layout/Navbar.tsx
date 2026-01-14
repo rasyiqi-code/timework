@@ -61,8 +61,6 @@ export function Navbar({ dict, locale, signInUrl, currentUser }: {
                 </div>
 
                 <div className="flex items-center gap-4">
-                    <LanguageToggle currentLocale={locale as "id" | "en"} />
-                    <ThemeToggle />
                     {currentUser ? (
                         <div className="flex items-center gap-2">
                             <span className="text-xs font-medium hidden md:inline-block text-slate-500 dark:text-slate-400">
@@ -78,6 +76,8 @@ export function Navbar({ dict, locale, signInUrl, currentUser }: {
                             {dict.nav.signIn}
                         </Link>
                     )}
+                    <LanguageToggle currentLocale={locale as "id" | "en"} />
+                    <ThemeToggle />
                 </div>
             </nav>
         </div>
