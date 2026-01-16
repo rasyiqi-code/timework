@@ -15,6 +15,7 @@ type ItemWithRelations = ProtocolItem & {
     children: (ProtocolItem & {
         defaultAssignee: { id: string, name: string | null } | null;
     })[];
+    requireAttachment?: boolean;
 };
 
 interface ProtocolItemRowProps {
@@ -46,6 +47,7 @@ export function ProtocolItemRow({ item, index, allItems, users }: ProtocolItemRo
     const [description, setDescription] = useState(item.description || '');
     const [assigneeId, setAssigneeId] = useState(item.defaultAssigneeId || '');
     const [type, setType] = useState(item.type);
+    const [requireAttachment, setRequireAttachment] = useState(item.requireAttachment || false);
 
     // Optimistic UI Hook
     const [optimisticItem, addOptimisticItem] = useOptimistic(
@@ -70,7 +72,8 @@ export function ProtocolItemRow({ item, index, allItems, users }: ProtocolItemRo
                 description,
                 type: type as ProtocolItem['type'],
                 defaultAssigneeId: assigneeId,
-                defaultAssignee: selectedUser ? { id: selectedUser.id, name: selectedUser.name } : null
+                defaultAssignee: selectedUser ? { id: selectedUser.id, name: selectedUser.name } : null,
+                requireAttachment
             });
 
             // 2. Close Form UI Immediately
@@ -83,6 +86,7 @@ export function ProtocolItemRow({ item, index, allItems, users }: ProtocolItemRo
                 formData.append('description', description);
                 formData.append('defaultAssigneeId', assigneeId);
                 formData.append('type', type);
+                formData.append('requireAttachment', String(requireAttachment));
 
                 await updateProtocolItem(item.id, formData);
                 toast.success('Saved');
@@ -99,6 +103,7 @@ export function ProtocolItemRow({ item, index, allItems, users }: ProtocolItemRo
         setDescription(item.description || '');
         setAssigneeId(item.defaultAssigneeId || '');
         setType(item.type);
+        setRequireAttachment(item.requireAttachment || false);
         setIsEditing(false);
     }
 
@@ -139,70 +144,81 @@ export function ProtocolItemRow({ item, index, allItems, users }: ProtocolItemRo
     if (isEditing) {
         return (
             <div ref={setNodeRef} style={style} className="relative group flex items-start opacity-100 scale-100 transition-all">
-                <div className="flex-1 bg-white border-2 border-indigo-500 rounded-lg p-2 shadow-md flex flex-col gap-2 dark:bg-slate-900 dark:border-indigo-500 z-10">
+                <div className="flex-1 bg-white border border-indigo-200 rounded-lg p-3 shadow-md flex flex-col gap-3 dark:bg-slate-900 dark:border-indigo-500/50 z-10 transition-all">
                     {/* EDIT FORM */}
-                    {/* EDIT FORM */}
-                    <div className="flex flex-col gap-2">
-                        {/* Type & Title Row */}
-                        <div className="flex flex-col md:flex-row gap-2 md:items-center">
-                            {/* Type Switcher */}
-                            <div className="flex bg-slate-100 rounded p-1 gap-1 shrink-0 dark:bg-slate-800 text-[10px] font-bold w-fit">
-                                <button type="button" onClick={() => setType('TASK')} className={`px-2 py-0.5 rounded transition-colors ${type === 'TASK' ? 'bg-white shadow text-indigo-600 dark:bg-slate-700 dark:text-indigo-300' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}>Task</button>
-                                <button type="button" onClick={() => setType('NOTE')} className={`px-2 py-0.5 rounded transition-colors ${type === 'NOTE' ? 'bg-white shadow text-amber-600 dark:bg-slate-700 dark:text-amber-300' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}>Note</button>
-                                <button type="button" onClick={() => setType('GROUP')} className={`px-2 py-0.5 rounded transition-colors ${type === 'GROUP' ? 'bg-white shadow text-slate-800 dark:bg-slate-700 dark:text-slate-200' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}>Group</button>
-                            </div>
+                    <div className="flex flex-col md:flex-row gap-3 items-start">
+                        {/* Type Switcher */}
+                        <div className="flex bg-slate-100 rounded-lg p-1 shrink-0 dark:bg-slate-800 text-[10px] font-bold border border-slate-200 dark:border-slate-700">
+                            <button type="button" onClick={() => setType('TASK')} className={`px-2 py-1.5 rounded-md flex items-center gap-1 transition-all ${type === 'TASK' ? 'bg-white shadow-sm text-indigo-600 dark:bg-slate-700 dark:text-indigo-300' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}>Task</button>
+                            <button type="button" onClick={() => setType('NOTE')} className={`px-2 py-1.5 rounded-md flex items-center gap-1 transition-all ${type === 'NOTE' ? 'bg-white shadow-sm text-amber-600 dark:bg-slate-700 dark:text-amber-300' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}>Note</button>
+                            <button type="button" onClick={() => setType('GROUP')} className={`px-2 py-1.5 rounded-md flex items-center gap-1 transition-all ${type === 'GROUP' ? 'bg-white shadow-sm text-slate-800 dark:bg-slate-700 dark:text-slate-200' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}>Group</button>
+                        </div>
 
+                        {/* Inputs Container */}
+                        <div className="flex-1 w-full space-y-2">
                             <input
                                 value={title}
                                 onChange={(e) => setTitle(e.target.value)}
-                                className="flex-1 px-2 py-1 text-sm font-bold border rounded focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:bg-slate-800 dark:border-slate-700 dark:text-white"
-                                placeholder="Title"
+                                className="w-full px-3 py-1.5 text-sm font-semibold border border-slate-200 rounded-md focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all dark:bg-slate-800 dark:border-slate-700 dark:text-white"
+                                placeholder="Task Title"
                                 autoFocus
                             />
+
+                            <textarea
+                                value={description}
+                                onChange={(e) => setDescription(e.target.value)}
+                                className="w-full px-3 py-1.5 text-xs text-slate-600 border border-slate-200 rounded-md focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 resize-y min-h-[40px]"
+                                placeholder="Description (Optional)..."
+                                rows={2}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Footer: Assignee & Actions */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100 dark:border-slate-800/50">
+                        <div className="flex items-center gap-3">
+                            {!isGroup && (
+                                <select
+                                    value={assigneeId}
+                                    onChange={(e) => setAssigneeId(e.target.value)}
+                                    className="px-2 py-1 text-xs border border-slate-200 rounded bg-slate-50 hover:bg-white transition-colors focus:ring-indigo-500 cursor-pointer dark:bg-slate-800 dark:border-slate-700 dark:text-white"
+                                >
+                                    <option value="">No Assignee</option>
+                                    {users.map(u => (
+                                        <option key={u.id} value={u.id}>{u.name || 'User'}</option>
+                                    ))}
+                                </select>
+                            )}
+
+                            {/* Divider */}
+                            {!isGroup && <div className="w-px h-4 bg-slate-200 dark:bg-slate-700"></div>}
+
+                            <label className="flex items-center gap-2 text-[10px] text-slate-500 cursor-pointer select-none hover:text-slate-800 transition-colors dark:text-slate-400 dark:hover:text-slate-200">
+                                <input
+                                    type="checkbox"
+                                    checked={requireAttachment}
+                                    onChange={(e) => setRequireAttachment(e.target.checked)}
+                                    className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:bg-slate-800 dark:border-slate-700"
+                                />
+                                <span>Require File Upload</span>
+                            </label>
                         </div>
 
-                        {/* Description */}
-                        <textarea
-                            value={description}
-                            onChange={(e) => setDescription(e.target.value)}
-                            className="w-full px-2 py-1 text-xs border rounded focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 resize-y"
-                            placeholder="Description..."
-                            rows={2}
-                        />
-
-                        {/* Footer: Assignee & Actions */}
-                        <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800/50 mt-1">
-                            <div className="w-40">
-                                {!isGroup && (
-                                    <select
-                                        value={assigneeId}
-                                        onChange={(e) => setAssigneeId(e.target.value)}
-                                        className="w-full px-2 py-1 text-xs border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white"
-                                    >
-                                        <option value="">No Assignee</option>
-                                        {users.map(u => (
-                                            <option key={u.id} value={u.id}>{u.name || 'User'}</option>
-                                        ))}
-                                    </select>
-                                )}
-                            </div>
-
-                            <div className="flex gap-1">
-                                <button
-                                    onClick={handleSave}
-                                    disabled={isPending}
-                                    className="px-3 py-1 bg-indigo-600 text-white text-xs font-bold rounded hover:bg-indigo-700 transition-colors flex items-center gap-1"
-                                >
-                                    <Check className="w-3.5 h-3.5" /> Save
-                                </button>
-                                <button
-                                    onClick={handleCancel}
-                                    disabled={isPending}
-                                    className="px-3 py-1 bg-slate-200 text-slate-600 text-xs font-bold rounded hover:bg-slate-300 transition-colors dark:bg-slate-700 dark:text-slate-300 flex items-center gap-1"
-                                >
-                                    <X className="w-3.5 h-3.5" /> Cancel
-                                </button>
-                            </div>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={handleCancel}
+                                disabled={isPending}
+                                className="px-3 py-1.5 bg-slate-100 text-slate-600 text-xs font-bold rounded-md hover:bg-slate-200 transition-colors dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 flex items-center gap-1"
+                            >
+                                <X className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Cancel</span>
+                            </button>
+                            <button
+                                onClick={handleSave}
+                                disabled={isPending}
+                                className="px-4 py-1.5 bg-indigo-600 text-white text-xs font-bold rounded-md hover:bg-indigo-700 shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-70 disabled:cursor-not-allowed"
+                            >
+                                <Check className="w-3.5 h-3.5" /> Save
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -257,6 +273,13 @@ export function ProtocolItemRow({ item, index, allItems, users }: ProtocolItemRo
                                             >
                                                 <StickyNote className="w-3.5 h-3.5" />
                                             </button>
+                                        )}
+                                    </div>
+                                    <div className="flex gap-1 mt-0.5">
+                                        {optimisticItem.requireAttachment && (
+                                            <span className="text-[9px] font-bold text-slate-500 bg-slate-100 px-1 py-0.5 rounded border border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700">
+                                                📎 File Required
+                                            </span>
                                         )}
                                     </div>
                                 </div>

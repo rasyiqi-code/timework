@@ -7,10 +7,15 @@ import { AssigneeSelector } from './AssigneeSelector';
 import { FolderOpen, StickyNote, CheckSquare } from 'lucide-react';
 import { type ProjectItem, type ItemDependency } from '@repo/database';
 import { type Dictionary } from '@/i18n/dictionaries';
+import { getPresignedUploadUrl, updateTaskAttachment, deleteTaskAttachment } from '@/actions/storage';
+import { toast } from 'sonner';
+import { Loader2, UploadCloud, Paperclip } from 'lucide-react';
 
 type ProjectItemWithRelations = ProjectItem & {
     dependsOn: (ItemDependency & { prerequisite: ProjectItem })[];
     requiredBy: ItemDependency[];
+    requireAttachment?: boolean; // Temporary fix for Prisma type sync issue
+    attachmentUrl?: string | null;  // Temporary fix for Prisma type sync issue
 };
 
 import type { User } from '@repo/database';
@@ -37,12 +42,72 @@ export function ProjectItemCard({ item, users, currentUser, dict, projectOwnerId
         });
     };
 
+    const [isUploading, setIsUploading] = useState(false);
+
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Validation (max 10MB)
+        if (file.size > 10 * 1024 * 1024) {
+            toast.error('File size too large (max 10MB)');
+            return;
+        }
+
+        setIsUploading(true);
+        try {
+            // 0. If there is an existing attachment, delete it first to avoid orphans in R2
+            if (item.attachmentUrl) {
+                await deleteTaskAttachment(item.id);
+            }
+
+            // 1. Get Presigned URL
+            const { uploadUrl, publicUrl } = await getPresignedUploadUrl(item.id, file.name, file.type);
+
+            // 2. Upload to R2 (Direct PUT)
+            const uploadRes = await fetch(uploadUrl, {
+                method: 'PUT',
+                body: file,
+                headers: {
+                    'Content-Type': file.type,
+                },
+            });
+
+            if (!uploadRes.ok) throw new Error('Upload failed');
+
+            // 3. Save URL to Database
+            await updateTaskAttachment(item.id, publicUrl);
+
+            toast.success('File uploaded');
+            router.refresh();
+        } catch (error) {
+            console.error(error);
+            toast.error('Upload failed');
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    const handleRemoveFile = async () => {
+        if (!confirm('Are you sure you want to remove this file? This action is permanent.')) return;
+
+        setIsUploading(true); // Reuse loading state
+        try {
+            await deleteTaskAttachment(item.id);
+            toast.success('File removed');
+            router.refresh();
+        } catch (error) {
+            console.error(error);
+            toast.error('Failed to remove file');
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
     // Check for Group / Subtask
     // Note: ProjectItem comes from @repo/database, assume updated types or cast if needed
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const itemType = (item as any).type || 'TASK';
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const parentId = (item as any).parentId;
+    const itemType = item.type || 'TASK';
+    const parentId = item.parentId;
     const isGroup = itemType === 'GROUP';
     const isSubtask = !!parentId;
 
@@ -60,6 +125,11 @@ export function ProjectItemCard({ item, users, currentUser, dict, projectOwnerId
 
     // General "Can Edit" flag for the toggle button
     const canEdit = canEditEverything || canEditDetailsOnly;
+
+    // Attachment check
+    const requireAttachment = item.requireAttachment;
+    const attachmentUrl = item.attachmentUrl;
+    const isUploadMissing = requireAttachment && !attachmentUrl;
 
     if (isGroup) {
         return (
@@ -205,52 +275,111 @@ export function ProjectItemCard({ item, users, currentUser, dict, projectOwnerId
                                 )}
                             </div>
                         </div>
-                    </div>
 
-                    {/* RIGHT: Assignee & Actions - Fixed width or shrink-0 */}
-                    <div className="flex items-center gap-2 shrink-0 w-full md:w-auto justify-end border-t md:border-t-0 pt-2 md:pt-0 border-slate-50 dark:border-slate-800">
-                        <div className="scale-90 origin-right">
-                            <AssigneeSelector
-                                itemId={item.id}
-                                currentUserId={item.assignedToId}
-                                users={users}
-                                isEditMode={isEditMode && canEditEverything}
-                            />
-                        </div>
+                        {/* Attachments Section */}
+                        {(requireAttachment || attachmentUrl) && (
+                            <div className={`mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 ${!isDetailsExpanded && 'hidden'}`}>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Attachment</span>
+                                    {requireAttachment && !attachmentUrl && (
+                                        <span className="text-[9px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-bold border border-red-200">REQUIRED</span>
+                                    )}
+                                </div>
 
-                        {item.status !== 'LOCKED' && !isGroup && (
-                            (() => {
-                                // Permission check uses top-level `canEdit`
-                                if (!canEdit) return null; // Or render disabled button
+                                <div className="mt-1 flex items-center gap-2">
+                                    {attachmentUrl ? (
+                                        <div className="flex items-center gap-2 group/file">
+                                            <a
+                                                href={attachmentUrl}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="flex items-center gap-1.5 bg-slate-100 text-slate-700 px-2 py-1.5 rounded text-xs hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 font-medium"
+                                            >
+                                                <Paperclip className="w-3.5 h-3.5" />
+                                                View File
+                                            </a>
 
-                                if (!canEdit) return null; // Or render disabled button
-
-                                return (
-                                    <button
-                                        onClick={() => handleStatusChange(item.id, item.status === 'DONE' ? 'OPEN' : 'DONE')}
-                                        disabled={isPending}
-                                        className={`
-                                            h-7 px-3 rounded-md text-xs font-semibold transition-all border shadow-sm flex items-center gap-1.5 cursor-pointer
-                                            ${isPending ? 'opacity-70 cursor-wait' : ''}
-                                            ${item.status === 'DONE'
-                                                ? 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800'
-                                                : 'bg-indigo-600 border-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-500'}
-                                        `}
-                                    >
-                                        {isPending ? (
-                                            '...'
-                                        ) : item.status === 'DONE' ? (
-                                            dict.project.detail.reopen
-                                        ) : isUnassigned ? (
-                                            dict.project.detail.take
-                                        ) : (
-                                            <><span>✓</span> {dict.project.detail.done}</>
-                                        )}
-                                    </button>
-                                );
-                            })()
+                                            {canEdit && (users.find(u => u.id === currentUser?.id) || isAdmin) && (
+                                                <label className="cursor-pointer text-[10px] text-indigo-500 hover:underline opacity-0 group-hover/file:opacity-100 transition-opacity">
+                                                    Replace
+                                                    <input type="file" className="hidden" onChange={handleFileUpload} disabled={isUploading} />
+                                                </label>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-2">
+                                            <label className={`
+                                                    flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold cursor-pointer transition-colors
+                                                    ${isUploading
+                                                    ? 'bg-slate-100 text-slate-500 cursor-wait'
+                                                    : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-800'}
+                                                `}>
+                                                {isUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UploadCloud className="w-3.5 h-3.5" />}
+                                                {isUploading ? 'Uploading...' : 'Upload File'}
+                                                <input type="file" className="hidden" onChange={handleFileUpload} disabled={isUploading} />
+                                            </label>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                         )}
                     </div>
+                </div>
+
+                {/* RIGHT: Assignee & Actions - Fixed width or shrink-0 */}
+                <div className="flex items-center gap-2 shrink-0 w-full md:w-auto justify-end border-t md:border-t-0 pt-2 md:pt-0 border-slate-50 dark:border-slate-800">
+                    <div className="scale-90 origin-right">
+                        <AssigneeSelector
+                            itemId={item.id}
+                            currentUserId={item.assignedToId}
+                            users={users}
+                            isEditMode={isEditMode && canEditEverything}
+                        />
+                    </div>
+
+                    {item.status !== 'LOCKED' && !isGroup && (
+                        (() => {
+                            // Permission check uses top-level `canEdit`
+                            if (!canEdit) return null;
+
+                            if (isUploadMissing) {
+                                return (
+                                    <button
+                                        disabled
+                                        className="h-7 px-3 rounded-md text-xs font-semibold bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed flex items-center gap-1.5 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-500"
+                                        title="File upload required to complete"
+                                    >
+                                        <p className="hidden md:block">Upload Required</p>
+                                        <UploadCloud className="w-3.5 h-3.5 md:hidden" />
+                                    </button>
+                                );
+                            }
+
+                            return (
+                                <button
+                                    onClick={() => handleStatusChange(item.id, item.status === 'DONE' ? 'OPEN' : 'DONE')}
+                                    disabled={isPending}
+                                    className={`
+                                        h-7 px-3 rounded-md text-xs font-semibold transition-all border shadow-sm flex items-center gap-1.5 cursor-pointer
+                                        ${isPending ? 'opacity-70 cursor-wait' : ''}
+                                        ${item.status === 'DONE'
+                                            ? 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800'
+                                            : 'bg-indigo-600 border-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-500'}
+                                    `}
+                                >
+                                    {isPending ? (
+                                        '...'
+                                    ) : item.status === 'DONE' ? (
+                                        dict.project.detail.reopen
+                                    ) : isUnassigned ? (
+                                        dict.project.detail.take
+                                    ) : (
+                                        <><span>✓</span> {dict.project.detail.done}</>
+                                    )}
+                                </button>
+                            );
+                        })()
+                    )}
                 </div>
             </div>
         </div>

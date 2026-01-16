@@ -194,6 +194,11 @@ export async function addDependency(prisma: PrismaClient, ctx: ProjectContext, i
         throw new Error('Prerequisite item not found or unauthorized');
     }
 
+    // Fix: Enforce same project to prevent cross-project dependency cycles
+    if (item.projectId !== prerequisite.projectId) {
+        throw new Error('Cannot depend on external project item');
+    }
+
     const graph = await buildDependencyGraph(prisma, item.projectId);
     const isCycle = detectCycle(graph, itemId, prerequisiteId);
     if (isCycle) {

@@ -109,7 +109,8 @@ export async function createFromProtocol(prisma: PrismaClient, ctx: ProjectConte
             originProtocolItemId: pItem.id,
             assignedToId: pItem.defaultAssigneeId,
             type: pItem.type,
-            order: pItem.order
+            order: pItem.order,
+            requireAttachment: pItem.requireAttachment
         }));
 
         if (itemsToCreate.length > 0) {

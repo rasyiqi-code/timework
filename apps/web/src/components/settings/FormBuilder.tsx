@@ -130,6 +130,9 @@ export function FormBuilder({ initialFields, dict }: FormBuilderProps) {
                                             placeholder={dict.placeholders.options}
                                             className="w-full text-sm rounded-md border-slate-200 py-1.5 px-3 bg-white dark:bg-slate-900 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none"
                                         />
+                                        <p className="text-[10px] text-slate-400 mt-1.5">
+                                            💡 Tip: Add <b>Custom</b> as an option to allow users to input their own text.
+                                        </p>
                                     </div>
                                 )}
                             </div>

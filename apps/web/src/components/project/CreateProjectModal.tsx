@@ -51,7 +51,12 @@ export function CreateProjectModal({ protocols, dict, fields }: { protocols: Pro
                             const values = formData.getAll(field.key);
                             if (values.length > 0) metadata[field.key] = values;
                         } else {
-                            const value = formData.get(field.key);
+                            let value = formData.get(field.key);
+                            // Custom Input Logic
+                            if (field.type === 'select' && value === 'Custom') {
+                                const customValue = formData.get(`${field.key}_custom`);
+                                if (customValue) value = customValue;
+                            }
                             if (value) metadata[field.key] = value;
                         }
                     });
@@ -92,18 +97,31 @@ export function CreateProjectModal({ protocols, dict, fields }: { protocols: Pro
                                 <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">{field.label}</label>
 
                                 {field.type === 'select' ? (
-                                    <select
-                                        name={field.key}
-                                        required={field.required}
-                                        value={formValues[field.key] || ''}
-                                        onChange={(e) => handleChange(field.key, e.target.value)}
-                                        className="w-full rounded-lg border border-slate-300 bg-white text-sm text-slate-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all py-2 px-3 cursor-pointer dark:bg-slate-950 dark:border-slate-700 dark:text-slate-100"
-                                    >
-                                        <option value="" disabled>{dict.common.select} {field.label}</option>
-                                        {field.options?.map(opt => (
-                                            <option key={opt} value={opt}>{opt}</option>
-                                        ))}
-                                    </select>
+                                    <>
+                                        <select
+                                            name={field.key}
+                                            required={field.required}
+                                            value={formValues[field.key] || ''}
+                                            onChange={(e) => handleChange(field.key, e.target.value)}
+                                            className="w-full rounded-lg border border-slate-300 bg-white text-sm text-slate-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all py-2 px-3 cursor-pointer dark:bg-slate-950 dark:border-slate-700 dark:text-slate-100"
+                                        >
+                                            <option value="" disabled>{dict.common.select} {field.label}</option>
+                                            {field.options?.map(opt => (
+                                                <option key={opt} value={opt}>{opt}</option>
+                                            ))}
+                                        </select>
+                                        {/* Custom Input Render */}
+                                        {formValues[field.key] === 'Custom' && (
+                                            <div className="mt-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                                                <input
+                                                    name={`${field.key}_custom`}
+                                                    required={field.required}
+                                                    placeholder={`Enter custom ${field.label.toLowerCase()}...`}
+                                                    className="w-full rounded-lg border border-slate-300 bg-slate-50 text-sm text-slate-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all py-2 px-3 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-100"
+                                                />
+                                            </div>
+                                        )}
+                                    </>
                                 ) : field.type === 'checkbox-group' ? (
                                     <div className="space-y-2 p-3 border border-slate-200 rounded-lg dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
                                         {field.options?.map(opt => (

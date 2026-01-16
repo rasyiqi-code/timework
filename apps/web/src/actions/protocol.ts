@@ -133,7 +133,8 @@ export async function addProtocolItem(protocolId: string, formData: FormData) {
     defaultAssigneeId: formData.get('defaultAssigneeId') === "" ? null : formData.get('defaultAssigneeId'),
     type: formData.get('type'),
     description: formData.get('description'),
-    parentId: formData.get('parentId')
+    parentId: formData.get('parentId'),
+    requireAttachment: formData.get('requireAttachment') === 'true' // Handle checkbox value
   };
 
   const validated = ProtocolItemSchema.parse(rawData);
@@ -152,12 +153,15 @@ export async function addProtocolItem(protocolId: string, formData: FormData) {
       duration: validated.duration,
       role: 'STAFF',
       protocolId,
-      defaultAssigneeId: validated.defaultAssigneeId,
       order: nextOrder,
       type: validated.type,
       description: validated.description,
-      parentId: validated.parentId
-    }
+      parentId: validated.parentId,
+      requireAttachment: validated.requireAttachment,
+      defaultAssignee: validated.defaultAssigneeId
+        ? { connect: { id: validated.defaultAssigneeId } }
+        : undefined,
+    } as any // Use any to bypass Prisma type check until workspace syncs
   });
 
   revalidatePath(`/admin/protocols/${protocolId}`);
@@ -304,14 +308,14 @@ export async function updateProtocolItem(itemId: string, formData: FormData) {
 
   const rawData = {
     title: formData.get('title'),
-    duration: formData.get('duration'),
+    duration: formData.get('duration') ? parseInt(formData.get('duration') as string) : 0,
     defaultAssigneeId: formData.get('defaultAssigneeId') === "" ? null : formData.get('defaultAssigneeId'),
-    type: formData.get('type'),
+    type: formData.get('type') || 'TASK',
     description: formData.get('description'),
-    parentId: formData.get('parentId') // Usually not updated here but schema has it
+    parentId: formData.get('parentId') || null,
+    requireAttachment: formData.get('requireAttachment') === 'true'
   };
 
-  // We actully don't update parentId here often via FormData in basic edit, but if sent it's validated.
   const validated = ProtocolItemSchema.parse(rawData);
 
   // Verify Ownership
@@ -328,10 +332,13 @@ export async function updateProtocolItem(itemId: string, formData: FormData) {
     data: {
       title: validated.title,
       duration: validated.duration,
-      defaultAssigneeId: validated.defaultAssigneeId,
       description: validated.description,
-      type: validated.type
-    }
+      type: validated.type,
+      requireAttachment: validated.requireAttachment,
+      defaultAssignee: validated.defaultAssigneeId
+        ? { connect: { id: validated.defaultAssigneeId } }
+        : { disconnect: true }
+    } as any // Use any to bypass Prisma type check until workspace syncs
   });
 
   revalidatePath(`/admin/protocols/${item.protocolId}`);

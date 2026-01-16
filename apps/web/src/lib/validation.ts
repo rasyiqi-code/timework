@@ -14,6 +14,7 @@ export const ProtocolItemSchema = z.object({
     type: ProtocolItemTypeEnum.optional().default('TASK'),
     description: z.string().optional().nullable(),
     parentId: z.string().optional().nullable(),
+    requireAttachment: z.boolean().optional().default(false),
 });
 
 export const ProjectSchema = z.object({
@@ -24,7 +25,7 @@ export const ProjectSchema = z.object({
 export const FormFieldSchema = z.object({
     key: z.string().min(1),
     label: z.string().min(1),
-    type: z.enum(['text', 'number', 'date', 'select', 'textarea']),
+    type: z.enum(['text', 'number', 'date', 'select', 'textarea', 'checkbox-group']),
     required: z.boolean().default(false),
     options: z.array(z.string()).optional(), // For select type
 });

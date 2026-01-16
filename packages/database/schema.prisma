@@ -134,6 +134,8 @@ model ProtocolItem {
   role        String?    @default("STAFF") 
   duration    Int      @default(1) // Default duration in days
   order       Int      @default(0)
+  requireAttachment Boolean  @default(false)
+  
   
   protocolId  String
   protocol    Protocol @relation(fields: [protocolId], references: [id], onDelete: Cascade)
@@ -182,6 +184,8 @@ model ProjectItem {
   // Sync from Protocol
   type        ProtocolItemType @default(TASK)
   order       Int              @default(0)
+  requireAttachment Boolean  @default(false)
+  attachmentUrl String?
   
   parentId    String?
   parent      ProjectItem?   @relation("SubProjectTasks", fields: [parentId], references: [id], onDelete: Cascade)
